@@ -19,7 +19,7 @@ data Tree =  Node Rule [Tree] | Term deriving (Show)
 
 -- if f1 is newer than f2 then we need to regenarete f2
 triggers::File->File->Bool
-triggers  "a" "b" = True 
+triggers  "a-2012" "b-2012" = True 
 triggers _ _ = False
 
 
@@ -59,7 +59,6 @@ execution::Tree->[Rule]
 execution Term = []
 execution (Node r childs) = (flatten (map execution childs)) ++ [r]
 
-myg = [(Rule "sort" ["a"] "b"), (Rule "sort" ["c"] "d"), (Rule "paste" ["b", "d"] "e")]
 -- let's build a parametric RuleSet
 -- sort a-$date > b-$date
 -- sort c > d
@@ -96,19 +95,19 @@ anchor_parameter params (ParametricRule command_gen file_list_gen file_gen) =
         (Rule (command_gen params) (file_list_gen params) (file_gen params))
 
 
-params = [(Param "date" (SValue "2012"))]
+
 
 my_template = create_string_template "a-$date"
 
 
 mypr = [ParametricRule (conts "sort") (parse_string_list ["a-$date"]) (create_string_template "b-$date"),
         ParametricRule (conts "sort") (parse_string_list ["c"]) (create_string_template "d"),
-        ParametricRule (conts "sort") (parse_string_list ["b-$date", "d"]) (create_string_template "e-$date")]
+        ParametricRule (conts "paste") (parse_string_list ["b-$date", "d"]) (create_string_template "e-$date")]
+params = [(Param "date" (SValue "2012"))]
+myg = (map (anchor_parameter params) mypr)
 
 main = do
-    print ((parse_string_list ["a-$date", "b"]) params)
-    print (map (anchor_parameter params) mypr)
-    print (get_value params "date")
-    print (my_template params)
-    print (rules_to_tree myg "e")
-    print (execution $ select $ rules_to_tree myg "e")
+
+    print (rules_to_tree myg "e-2012")
+    print (select $ rules_to_tree myg "e-2012")
+    print (execution $ select $ rules_to_tree myg "e-2012")
