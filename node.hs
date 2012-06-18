@@ -1,6 +1,19 @@
+import Data.List.Split
+
 type Command = String
 type File = String
+
+type Name = String
+data Value = SValue String | IValue Int deriving (Show)
+data Param = Param Name Value deriving (Show)
+type Params = [Param]
+type FileGen = Params->File
+type FileListGen = Params->[File]
+type CommandGen = Params->Command
+
 -- 
+
+data ParametricRule = ParametricRule CommandGen FileListGen FileGen
 data Rule = Rule Command [File] File deriving (Show)
 data Tree =  Node Rule [Tree] | Term deriving (Show)
 
@@ -47,6 +60,55 @@ execution Term = []
 execution (Node r childs) = (flatten (map execution childs)) ++ [r]
 
 myg = [(Rule "sort" ["a"] "b"), (Rule "sort" ["c"] "d"), (Rule "paste" ["b", "d"] "e")]
+-- let's build a parametric RuleSet
+-- sort a-$date > b-$date
+-- sort c > d
+-- paste b-$date d > e-$date
+conts x _ = x
+
+get_value::Params->Name->Value
+get_value params n =
+    case filter (\(Param n' _) -> n' == n) params of
+        [] -> error "not found"
+        (Param _ v):xs ->v
+
+to_string::Value->String
+to_string (SValue v) = v
+to_string (IValue v) = show v
+
+
+create_string_template::String->(Params->String)
+create_string_template s = 
+    -- this is a temporal solution, we just check the end of the string
+    case splitOn "$" s of
+        [] -> error "empty string"
+        [s] -> const s
+        n:p:[] -> \params -> n++(to_string (get_value params p))
+
+join_templates::[Params->String]->(Params->[String])
+join_templates l = \params -> (map (\template -> template params) l)
+
+parse_string_list::[String]->FileListGen
+parse_string_list l = join_templates $ map create_string_template l
+
+anchor_parameter::Params->ParametricRule->Rule
+anchor_parameter params (ParametricRule command_gen file_list_gen file_gen) =
+        (Rule (command_gen params) (file_list_gen params) (file_gen params))
+
+
+params = [(Param "date" (SValue "2012"))]
+
+my_template = create_string_template "a-$date"
+
+
+mypr = [ParametricRule (conts "sort") (parse_string_list ["a-$date"]) (create_string_template "b-$date"),
+        ParametricRule (conts "sort") (parse_string_list ["c"]) (create_string_template "d"),
+        ParametricRule (conts "sort") (parse_string_list ["b-$date", "d"]) (create_string_template "e-$date")]
+
 main = do
+    print ((parse_string_list ["a-$date", "b"]) params)
+    print (map (anchor_parameter params) mypr)
+    print (get_value params "date")
+    print (my_template params)
     print (rules_to_tree myg "e")
     print (execution $ select $ rules_to_tree myg "e")
