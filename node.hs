@@ -20,7 +20,8 @@ data Tree =  Node Rule [Tree] | Term deriving (Show)
 -- if f1 is newer than f2 then we need to regenarete f2
 triggers::File->File->Bool
 triggers  "a-2012" "b-2012" = True 
-triggers _ _ = False
+triggers "a-3" "b-3" = False
+triggers _ _ = True
 
 
 generates::File->Rule->Bool
@@ -95,19 +96,22 @@ anchor_parameter params (ParametricRule command_gen file_list_gen file_gen) =
         (Rule (command_gen params) (file_list_gen params) (file_gen params))
 
 
-
-
-my_template = create_string_template "a-$date"
-
-
 mypr = [ParametricRule (conts "sort") (parse_string_list ["a-$date"]) (create_string_template "b-$date"),
         ParametricRule (conts "sort") (parse_string_list ["c"]) (create_string_template "d"),
         ParametricRule (conts "paste") (parse_string_list ["b-$date", "d"]) (create_string_template "e-$date")]
 params = [(Param "date" (SValue "2012"))]
 myg = (map (anchor_parameter params) mypr)
 
-main = do
+-- sort a-num > b-num
+-- cat b-$(num <- [1..4]) > c
+rule1 = ParametricRule (const "sort") (parse_string_list ["a-$num"])  (create_string_template "b-$num")
 
-    print (rules_to_tree myg "e-2012")
-    print (select $ rules_to_tree myg "e-2012")
-    print (execution $ select $ rules_to_tree myg "e-2012")
+rule2 = Rule "cat" ["b-" ++ (show num) | num <- [1..4]] "c" 
+rules = [anchor_parameter [(Param "num" (IValue num))] rule1 | num <- [1..4]]
+rules3 = rule2 :rules
+tree = rules_to_tree rules3 "c"
+
+main = do
+    print (rules3)
+    print (tree )
+    print (execution $ select $ tree)
