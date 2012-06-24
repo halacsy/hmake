@@ -7,9 +7,11 @@ module Logic(
 	, (##)
 	, Params
 	, Cmd
+	, make
 	, substitute
 	, create_file
 	, params_from_list
+	, rules_to_tree
 ) where
 import Data.List.Utils(join)
 import Data.Maybe
@@ -87,7 +89,51 @@ anchor_rule file (Rule output cmdGen) =
 	let (inputs, cmd) = cmdGen params in
 	Just (AnchoredRule (substitute output params) inputs cmd)
 
-	--simple_rule f1 cmd f2 = Rule {cmd=cmd, inputs=[file_from_string f1], output=(file_from_string f2)}
+data Tree =  Node AnchoredRule [Tree] | Term deriving (Show)
+
+rules_to_tree::[Rule]->File->Tree
+rules_to_tree rules f =
+    case mapMaybe (anchor_rule f) rules of
+        [] -> Term
+        rule@(AnchoredRule output inputs cmd):_ -> Node rule (map (rules_to_tree rules) inputs )
+   
+triggers f1 f2 = True
+
+should_be_rerun::AnchoredRule->Bool    
+should_be_rerun (AnchoredRule output inputs _) =
+    or (map (\f -> triggers f output ) inputs)
+
+
+
+-- selects subtree which should be executed
+select::Tree->Tree
+select Term = Term
+select (Node r childs) = -- this must be executed if any of it's child
+                let ct = filter is_not_term (map select childs) in
+                if (null ct) && not (should_be_rerun r) then
+                    Term
+                else 
+                    (Node r ct)
+                where
+                -- maybe there is a shorter version of this
+                is_not_term Term = False
+                is_not_term _ = True 
+
+flatten :: [[a]] -> [a]
+flatten l = foldl (++) [] l
+
+execution::Tree->[AnchoredRule]
+execution Term = []
+execution (Node r childs) = (flatten (map execution childs)) ++ [r]
+
+make::[Rule]->File->[AnchoredRule]
+make rules file =  execution . select $ rules_to_tree rules file
+
+
+--	let tree = rules_to_tree rules file in
+--				   let selected = select tree in
+--				   execution selected
+
 instance Show Rule where
     show (Rule output cmdGen) = 
     	let (inputs, cmd) = cmdGen ( anchored_parameters output ) in
