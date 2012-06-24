@@ -1,27 +1,35 @@
 module Logic(
-	Rule
-	, File
+	Rule(Rule)
+	,AnchoredRule(AnchoredRule)
+	, anchor_rule
+	, File(name)
+	, (#)
+	, (##)
+	, Params
+	, Cmd
 	, substitute
 	, create_file
-	, create_rule
-	, hamake
-	, rules_to_tree) where
+	, params_from_list
+) where
 import Data.List.Utils(join)
 import Data.Maybe
-
+import qualified Data.Map.Strict as Map
 
 data File = File { name :: String  
-				     , gen :: [(String, String)] -> String
+				     , gen :: Params -> String
                      , pnames :: [String]  
-                     , anchored_parameters :: [(String, String)]  
+                     , anchored_parameters :: Params 
                      }
 
 --create_file::String->[(String, String)] -> String->[String] ->[(String, String)]  
 create_file name gen pnames anchored_parameters = File {name = name, gen = gen, pnames = pnames, anchored_parameters=anchored_parameters}
 
+params_from_list::[(String, String)]->Params
+params_from_list = Map.fromList
+
 not_anchored_params::File->[String]
 not_anchored_params f =
-	let anchored = map fst $ anchored_parameters f in
+	let anchored = Map.keys (anchored_parameters f) in
 	filter (`notElem` anchored) (pnames f)
 
 -- file_from_string s = File {name = s, pnames=[], anchored_parameters=[]}
@@ -32,113 +40,56 @@ is_fully_anchored f =
 instance Show File where
     show f =  
     	let anchored = anchored_parameters f in
-    	let str_anchored = map (\(a,b) -> a ++ "=" ++ b)  anchored in
+    	let str_anchored = map (\(a,b) -> a ++ "=" ++ b)  (Map.assocs anchored) in
     	let not_anchored = not_anchored_params f in
     	if is_fully_anchored f then
 			((gen f) (anchored_parameters f)) 
 		else
 			(name f) ++  ":[" ++ (join "," ( not_anchored)) ++ "/" ++  (join ","  str_anchored) ++ "]" 
 
-data Rule = Rule { cmd:: String
-				   ,inputs::[File]
-				   ,output::File 
-				   } 
-
-substitute::File->String->String->File
-substitute f p v =
-	if notElem p (pnames f) then error (p ++ " is not parameter of " ++ (name f)) else
-	create_file (name f) (gen f) (pnames f) ((p, v) : anchored_parameters f )
-
-create_rule cmd i o = Rule {cmd = cmd, inputs = i, output = o}
---simple_rule f1 cmd f2 = Rule {cmd=cmd, inputs=[file_from_string f1], output=(file_from_string f2)}
-instance Show Rule where
-    show r = (cmd r)  ++ " " ++ (join " " ( map show $ inputs r)) ++ " > " ++ show  (output r)
-
-data Tree =  Node Rule [Tree] | Term deriving (Show)
-
--- sort a-$date > b-$date
--- sort c > d
--- paste b-$date=1 b-$date=2 d > e
-
-generates::File->Rule->Bool
-generates f r = let o = (output r) in
-				name o == name f 
-
--- returns elements from xs which are in ys
-subitems xs ys = filter (`elem` ys) xs
-nsubitems xs ys = filter (\i -> not (elem i ys)) xs
-
-get_anchored::[(String, String)]->[String] -> [(String, String)]
-get_anchored anchored params =
-	mapMaybe aux params
-	where  aux p = case (lookup p anchored) of
-		Nothing -> Nothing
-		Just v -> Just (p, v)
+substitute::File->Params->File
+substitute f params =
+	Map.foldlWithKey aux f params
+	--aux::File->String->String->String
+	where aux f k v =
+		if notElem k (pnames f) then error (k ++ " is not parameter of " ++ (name f)) else
+		create_file (name f) (gen f) (pnames f) (Map.insert k v (anchored_parameters f) )
 
 
-anchor_rule::File->Rule->Maybe Rule
-anchor_rule file rule =
+type Params = Map.Map String String
+type Cmd = String
+
+type CmdGen =  (Params -> ([File], Cmd))
+data Rule = Rule File CmdGen
+data AnchoredRule = AnchoredRule File [File] Cmd deriving Show
+
+(#)::Params->String->String
+(#) params k = case Map.lookup k params of
+		Just v -> v
+		_ -> error ("can't find " ++ k ++ " in " ++ (show params))
+
+(##)::Params->(String, String)->Params
+(##) params (k,v) = Map.insert k v params
+
+anchor_rule::File->Rule->Maybe AnchoredRule
+anchor_rule file (Rule output cmdGen) =
 	-- paste a-1 > d 
 	-- paste a-$date > c-[date=1]
+	if not (is_fully_anchored file) then error ("can't anchor rule to generate abstract file " ++ (show file)) else
+	let params = (anchored_parameters file) in
+	
 
-
-	let ap = map fst (anchored_parameters file) in
-	let o = output rule in
-	if name o /= name file then Nothing else
+	if name output /= name file then Nothing else
 	-- TODO: covers?
 	-- sort a-$date > c-$date can't generate c (without any argument)
-	if pnames o /= pnames file then Nothing else
+	--if pnames output /= pnames file then Nothing else
 
-	let i = map (\f->File {name = (name f), gen=(gen f), pnames = (pnames f), anchored_parameters = anchor_for_file f}) (inputs rule) in
-	Just Rule {cmd = (cmd rule), inputs = i, output = file}
-	where anchor_for_file f =
-		-- this is what we have to anchor
-		(get_anchored (anchored_parameters file) (pnames f))
-		++ -- already anchored
-		(anchored_parameters f)
-triggers f1 f2 = True
+	let (inputs, cmd) = cmdGen params in
+	Just (AnchoredRule (substitute output params) inputs cmd)
 
---triggers _ _ = True
-
-rules_to_tree::[Rule]->File->Tree
-rules_to_tree rules f =
-    case mapMaybe (anchor_rule f) rules of
-        [] -> Term
-        [rule] -> Node rule (map (rules_to_tree rules) (inputs rule))
-        _ -> error ((name f) ++ " is generated by >1 rules")
-
-should_be_rerun rule =
-	let o = output rule in
-	let is = inputs rule in
-    or (map (\f -> triggers f o ) is)
-
-
-
--- selects subtree which should be executed
-select::Tree->Tree
-select Term = Term
-select (Node r childs) = -- this must be executed if any of it's child
-                let ct = filter is_not_term (map select childs) in
-                if (null ct) && not (should_be_rerun r) then
-                    Term
-                else 
-                    (Node r ct)
-                where
-                -- maybe there is a shorter version of this
-                is_not_term Term = False
-                is_not_term _ = True 
-
-flatten :: [[a]] -> [a]
-flatten l = foldl (++) [] l
-
-execution::Tree->[Rule]
-execution Term = []
-execution (Node r childs) = (flatten (map execution childs)) ++ [r]
-
-hamake :: File -> [Rule]->[Rule]
-hamake f rules = execution ( select ( rules_to_tree rules f))
-
---createProcess (shell "ls")
-
-
+	--simple_rule f1 cmd f2 = Rule {cmd=cmd, inputs=[file_from_string f1], output=(file_from_string f2)}
+instance Show Rule where
+    show (Rule output cmdGen) = 
+    	let (inputs, cmd) = cmdGen ( anchored_parameters output ) in
+    	show output ++  "->" ++ " " ++ (join " " ( map show inputs )) 
 

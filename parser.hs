@@ -3,30 +3,27 @@ module Parser
 		Chunk(Part, KV, K)
 	 ,  parseFileName
      , fp
-	 , add_rule
-	 , add_bi_rule
-	 , build_rules
-	 , make
 	 ) where
 
 import Text.ParserCombinators.Parsec hiding (State)
 import Data.Maybe
 import Data.List(nub)
-import Logic(create_file)
 
 import Control.Monad.State(modify, State, execState)
-import Logic(File, Rule, create_file, create_rule, hamake) 
+import Logic(File, Rule, create_file, params_from_list, Params) 
 import Data.List.Split(splitOn)
 import Data.Maybe
+
+import qualified Data.Map.Strict as Map
 
 data Chunk = Part String | KV String String | K String deriving Show
 
 
-add_bi_rule i1 i2 cmd o = modify $ (:) (create_rule cmd [(fp i1),(fp i2)]  (fp o))
+--add_bi_rule i1 i2 cmd o = modify $ (:) (create_rule cmd [(fp i1),(fp i2)]  (fp o))
 
-add_rule i cmd o  = modify $ (:) (create_rule cmd [(fp i)]  (fp o))
-build_rules :: State ([Rule]) () -> [Rule]
-build_rules f = execState f []
+--add_rule i cmd o  = modify $ (:) (create_rule cmd [(fp i)]  (fp o))
+--build_rules :: State ([Rule]) () -> [Rule]
+--build_rules f = execState f []
 
 
 fileName :: GenParser Char st [Chunk]
@@ -54,11 +51,11 @@ keyOnly = do
 key :: GenParser Char st String
 key = do
 	d <- dollar
-	many (noneOf "=,\n$-/")
+	many (noneOf "=,\n$-/_")
 
 value :: GenParser Char st String
 value =
-	many (noneOf ",\n=/$")
+	many (noneOf ",\n=/$-_")
 
 dollar = char '$'
 eq :: GenParser Char st Char
@@ -69,9 +66,9 @@ parseFileName :: String -> Either ParseError [Chunk]
 parseFileName input = parse fileName "(unknown)" input
 
 
-match::[Chunk]->String->[(String,String)]->String
+match::[Chunk]->String->Params->String
 match chunks name params = foldl (++) "" (map chunk_to_string chunks) where
-	chunk_to_string (K k) = case lookup k params of
+	chunk_to_string (K k) = case Map.lookup k params of
     							  		Nothing -> error ("can't find " ++ k ++ " in " ++ (show params) ++ " for file " ++ name) 
     							  		Just v -> v
     	chunk_to_string (Part p) = p
@@ -97,10 +94,10 @@ fp s =
                         _ -> Nothing in
     let name = foldl (++) "" (mapMaybe collectNames chunks) in
   
-    create_file name (match chunks name)  params kvs
+    create_file name (match chunks name)  params (params_from_list kvs)
 
 
-make f r = hamake (fp f) r
+--make f r = hamake (fp f) r
 
 main = do
- 	print (fp "b/$date=2/$month=4") 
+ 	print (parseFileName "monthly_uniq_users-$year=2012-$month=01") 
