@@ -96,39 +96,53 @@ rules_to_tree rules f =
     case mapMaybe (anchor_rule f) rules of
         [] -> Term
         rule@(AnchoredRule output inputs cmd):_ -> Node rule (map (rules_to_tree rules) inputs )
-   
-triggers f1 f2 = True
 
-should_be_rerun::AnchoredRule->Bool    
+stat_file::File->IO Int 
+stat_file _ = do 
+	return 5
+
+should_be_rerun_by_stat::Int->[Int]->Bool
+should_be_rerun_by_stat output inputs =
+	null (filter (<output) inputs)
+
+should_be_rerun::AnchoredRule->IO Bool    
 should_be_rerun (AnchoredRule output inputs _) =
-    or (map (\f -> triggers f output ) inputs)
-
-
+	do
+		o <- stat_file output
+		dates <-  sequence (map stat_file  inputs)
+		return (should_be_rerun_by_stat o dates)
 
 -- selects subtree which should be executed
-select::Tree->Tree
-select Term = Term
+select::Tree->IO Tree
+select Term = return Term
 select (Node r childs) = -- this must be executed if any of it's child
-                let ct = filter is_not_term (map select childs) in
-                if (null ct) && not (should_be_rerun r) then
-                    Term
-                else 
-                    (Node r ct)
-                where
-                -- maybe there is a shorter version of this
-                is_not_term Term = False
-                is_not_term _ = True 
+		do
+                x <- should_be_rerun r
+                c <- sequence $ map select childs
+                let ct = filter is_not_term c in
+                 if (null ct) && (not x) then
+                    return Term
+                 else 
+                    return (Node r ct)
+                 where
+                 -- maybe there is a shorter version of this
+                 is_not_term Term = False
+                 is_not_term _ = True 
 
 flatten :: [[a]] -> [a]
 flatten l = foldl (++) [] l
 
-execution::Tree->[AnchoredRule]
-execution Term = []
-execution (Node r childs) = (flatten (map execution childs)) ++ [r]
+execution::Tree->IO [AnchoredRule]
+execution Term = return []
+execution (Node r childs) = do
+		c <- sequence $ map execution childs
+		return ( (flatten c) ++ [r])
 
-make::[Rule]->File->[AnchoredRule]
-make rules file =  execution . select $ rules_to_tree rules file
-
+make::[Rule]->File->IO [AnchoredRule]
+make rules file =  do
+	s <- (select $ rules_to_tree rules file)
+	execution s
+	
 
 --	let tree = rules_to_tree rules file in
 --				   let selected = select tree in
