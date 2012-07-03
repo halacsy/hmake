@@ -15,6 +15,9 @@ module Logic(
 ) where
 import Data.List.Utils(join)
 import Data.Maybe
+import Hdfs
+import Data.Time.LocalTime
+
 import qualified Data.Map.Strict as Map
 
 data File = File { name :: String  
@@ -28,6 +31,9 @@ create_file name gen pnames anchored_parameters = File {name = name, gen = gen, 
 
 params_from_list::[(String, String)]->Params
 params_from_list = Map.fromList
+
+anchored_name::File->String
+anchored_name f = (gen f)  (anchored_parameters f)
 
 not_anchored_params::File->[String]
 not_anchored_params f =
@@ -97,19 +103,24 @@ rules_to_tree rules f =
         [] -> Term
         rule@(AnchoredRule output inputs cmd):_ -> Node rule (map (rules_to_tree rules) inputs )
 
-stat_file::File->IO Int 
-stat_file _ = do 
-	return 5
+should_be_rerun_by_stat::Maybe LocalTime->[Maybe LocalTime]->Bool
+-- if the output doesn't exist -> must run
+should_be_rerun_by_stat Nothing _ = True
+should_be_rerun_by_stat (Just time) inputs = 
+	foldl needed False inputs where
+		needed True _ = True
+		needed _ Nothing = True
+		needed _ (Just t) 
+			| t > time = True
+			| otherwise = False
 
-should_be_rerun_by_stat::Int->[Int]->Bool
-should_be_rerun_by_stat output inputs =
-	null (filter (<output) inputs)
+stat_file = last_modified2
 
 should_be_rerun::AnchoredRule->IO Bool    
 should_be_rerun (AnchoredRule output inputs _) =
 	do
-		o <- stat_file output
-		dates <-  sequence (map stat_file  inputs)
+		o <- stat_file $ anchored_name output
+		dates <-  sequence (map stat_file  (map anchored_name inputs))
 		return (should_be_rerun_by_stat o dates)
 
 -- selects subtree which should be executed

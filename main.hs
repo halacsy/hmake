@@ -29,7 +29,7 @@ previous_month::String->String
 previous_month m = show $ ((read m)::Int)  - 1
 
 days_of_month::String->[String]
-days_of_month m =  map show [1..30]
+days_of_month m =  map show [1..1]
 
 this_and_previous_month m = [previous_month m , m]
 
@@ -49,5 +49,7 @@ main = do
 	--print (create_string_template "c")
 	--print (create_string_template "c$date")
 	--print (create_string_template "c$date=1")
+	print "hello"
 	rules <- make rules target
+	print (length rules)
 	print_rules  rules
