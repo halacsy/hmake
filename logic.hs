@@ -13,7 +13,7 @@ cat user-$y-$m-$d=(day_of_month $y $m) | sort | uniq > monthy-user-$y-$m
 -- van-e output? meg van-e minden input
 -- le_kell_e_futtatni::String->[String]->IO Bool
 
-type Cmd = String
+type Cmd = ()-> IO String 
 type File = String
 isMoreRecent (dep:deps) reference = True
 
@@ -25,7 +25,7 @@ generateCommand deps myOutput cmd
 
 data DepGraph = 
 	InputFile File |
-	GeneratedFile [DepGraph] File Cmd deriving (Show)
+	GeneratedFile [DepGraph] File Cmd 
 
 output::DepGraph->File
 output (InputFile f) = f
@@ -75,23 +75,33 @@ napi_log y m d = InputFile $ "napi_log-" ++ show y ++ "-" ++ show m ++ "-" ++ sh
 
 user y m d = GeneratedFile deps myOutput cmd
   where
-    cmd = "grep 'user'"
+    cmd = grep_command (napi_log y m d)
     deps = [napi_log y m d]
     myOutput = "user-" ++ show y ++ "-" ++ show m ++ "-" ++ show d
 
+grep_command::DepGraph->()->IO String
+grep_command (InputFile f) _ = return ("grep " ++ f)
 
 monthly_user y m = GeneratedFile deps myOutput cmd
   where
-    cmd = "sort | uniq "
+    cmd = \_ -> return "concat"
     deps = [user y m d | d <- day_of_month y m]
     myOutput = "monthly-user-" ++ show y ++ "-" ++ show m
 
 day_of_month y m = [1..2]
 
+execute:: ([File], Cmd, File) -> IO String
+execute (inputs, cmd, o) = do
+    r <- cmd ()
+    print r
+    return r
 
-
+a::()->IO String
+a _ = return "hello"
 
 main = do 
     g <- select $ monthly_user 2012 5
     g2 <- execution g
-    print g2
+    e <- a ()
+    print e
+    mapM_  execute g2
