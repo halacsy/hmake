@@ -7,7 +7,7 @@ import Data.Time.LocalTime
 import System.Posix.Files
 
 last_modified2 :: String-> IO (Maybe LocalTime)
-last_modified2 f = do
+last_modified f = do
 	
 	 (exit, out, err) <- readProcessWithExitCode  "hadoop" ["fs", "-stat", f] ""
 	 print out
@@ -23,7 +23,7 @@ last_modified3 f = do
 		return Nothing -- $ Just  ( modificationTime stat )
 
 last_modified ::String -> IO (Maybe LocalTime)
-last_modified f = do
+last_modified2 f = do
 				   return Nothing
 
 exist::String-> IO Bool

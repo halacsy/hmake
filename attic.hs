@@ -50,3 +50,16 @@ main = do
 	print (get_anchored (anchored_parameters b1) ["date"])
 	print r3
 	print (execution $ select $ rules_to_tree rules target)
+
+type OnlyFile = File 
+
+cat::File->OnlyFile
+cat f = f
+
+type WithoutOutput = (File, String)
+(||)::OnlyFile->String->WithoutOutput
+(||) f c = (f, c)
+
+(>)::WithoutOutput->File->Rule
+(>) (input, cmd) output =  (Rule output (\params -> ([substitute input params] , cmd)))
+
