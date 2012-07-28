@@ -9,7 +9,7 @@ import Control.Monad.State(modify, State, execState)
 import Logic
 import Data.List.Split(splitOn)
 import Data.Maybe
-
+import Text.Printf
 import qualified Data.Map.Strict as Map
 
 data Expr = Expr String [String] deriving Show
@@ -81,26 +81,15 @@ eq = char '='
 parseFileName :: String -> Either ParseError [Chunk]
 parseFileName input = parse fileName "(unknown)" input
 
+get_chunks s = 
+       case parseFileName s  of
+            (Left err) -> error (show err)
+            (Right r) -> r 
 
-match2::[Chunk]->String->Params->String
-match2 chunks name params = foldl (++) "" (map chunk_to_string chunks) where
-	chunk_to_string (K k) = case Map.lookup k params of
-    							  		Nothing -> error ("can't find " ++ k ++ " in " ++ (show params) ++ " for file " ++ name) 
-    							  		Just v -> v
-    	chunk_to_string (Part p) = p
-    	chunk_to_string (KV k v) = v
-        chunk_to_string (KF k e) = k
-
--- returns a \p -> fun_name p function
-
-
-fp::String->(File, String, Expr)
-fp s = 
-	-- this should be shorted
+get_params s =
     let chunks = case parseFileName s  of
             (Left err) -> error (show err)
-            (Right r) -> r
-    in
+            (Right r) -> r in 
     let collectParam chunk = case chunk of 
                         K k -> Just k
                         KV k _ -> Just k
@@ -108,54 +97,58 @@ fp s =
                         _ -> Nothing in
     -- nub == sort | uniq 
     let params = nub $ mapMaybe collectParam chunks in
+    params
 
-    let collectKVs chunk = case chunk of
-                        KV k v -> Just (k,v)
-                        _ -> Nothing in
-    let kvs = nub $ mapMaybe collectKVs chunks in
+my_concat = (++)
+appEE f p1 p2 = 
+    (AppE (AppE f p1) p2)
 
-    let collectNames chunk = case chunk of
-                        Part s -> Just s
-                        _ -> Nothing in
-    let name = foldl (++) "" (mapMaybe collectNames chunks) in
-    -- TODO, eliminate heads
-    let collectKFs chunk = case chunk of
-                        KF name expr -> Just (name, expr)
-                        _ -> Nothing in
-    let (fname, pexpr) = head $ mapMaybe collectKFs chunks in
+{- create_printf "%s %s" [a, b] == printf "%s %s a b -}
+create_printf::[Chunk]->Exp
+create_printf chunks =  join $ map toE chunks
+    where 
+        toE (Part s) = (LitE (stringL s))
+        toE (K s) = showE (VarE (mkName s))
+      
+        join = foldl (\acc e -> appEE concatE acc e)  empty 
+        empty = (LitE (stringL "" ))
+        concatE = (VarE (mkName "my_concat"))
+        {-
+        apply f (Part s) = (AppE f ()
+        printfStub = printfE printfP  -- printf "%s %s"
+        printfE = (AppE (VarE (mkName "printf")))
+        printfP = (LitE (stringL format ))
+        -}
+        --params = map  showE $ map VarE $ map mkName l
+        showE = (AppE (VarE (mkName "show")))
 
-    let file_name_generator = let chunks' = map (\c -> case c of 
-                                                    KF name _ -> K name 
-                                                    x -> x) chunks in
-         match2 chunks' name 
-    in
-    (create_file name file_name_generator  params (params_from_list kvs), fname, pexpr)
-   
+input_file  s = 
+        return $ (LamE varps body)
+        --return $ [ FunD ( mkName n) [ ( Clause varps (NormalB body) []) ] ]
+        where   
+            varps = (map (\n -> VarP n) names)
+            body = (AppE (ConE (mkName "InputFile")) (create_printf (chunks)))
+            chunks = get_chunks s
+            names = map mkName params
+            params = get_params s
 
-funnel file oparam function iparam cmd =
-    \params ->
-        ((map (\v -> substitute file (params##(oparam, v)))) (function (params#iparam)) , cmd)
+rule::[DepGraph]->File->a ->Exp
+rule deps output c = (AppE (AppE (AppE (ConE (mkName "GeneratedFile")) depsE) outputE) cmdE)
+    where
+        depsE = undefined
+        outputE = undefined
+        cmdE = undefined
+  {-       
+  GeneratedFile deps myOutput cmd
+  where
+    cmd = grep_command (napi_log y m d)
+    deps = [napi_log y m d]
+    myOutput = "user-" ++ show y ++ "-" ++ show m ++ "-" ++ show d
+ -}
+    -- p_0 <- newName "p"
+        -- Prelude Language.Haskell.TH> runQ [| \p -> head p |] >>= print
+        -- LamE [VarP p_0] (AppE (VarE GHC.List.head) (VarE p_0))
+    --    return (LamE [VarP p_0] (AppE (VarE (  mkName fun_name)) (VarE p_0)))
 
--- cat input[input_param=generate(output_param)] | cmd > output(output_param)
-funnel_rule what from_what output_param generate input_param cmd =
-    (Rule what ( funnel  from_what output_param generate input_param cmd))
-
-parse_output str = 
-    let (f, _, _) = fp str in f
-
-days_of_month::String->[String]
-days_of_month y  =  map show [1..5]
-
-cmd = "cat"
-(input_template, running_param, (Expr fname params)) = fp "daily_uniq_users-$year=2012-$month=01-$day=(day_of_month $month)" 
-p = head params
-output = (parse_output "monthly-$year-$month")
-func = days_of_month
-
-r = funnel_rule output input_template running_param func p cmd
-
-rule:: Q Exp
-rule = 
-
-    do
-    return $ AppE (AppE (AppE (AppE (AppE (AppE (VarE (mkName "funnel_rule")) (VarE (mkName "output"))) (VarE (mkName "input_template"))) (VarE $ mkName "running_param")) (VarE $ mkName funname )) (VarE $ mkName "p")) (VarE $ mkName "cmd")
+--main = do
+ --   print $ input_file "$year $month $day"

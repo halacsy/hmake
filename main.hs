@@ -1,85 +1,74 @@
-import Parser
+{- NoMonomorphismRestriction -}
 import Logic
-import Control.Monad.State(modify, State, execState)
+--import Parser
 
--- f = substitute daily_active_users [("year", "2009"), ("month", "12"), ("day", "02")]
-
-
-
-funnel file oparam function iparam cmd =
-	\params ->
-		((map (\v -> substitute file (params##(oparam, v)))) (function (params#iparam)) , cmd)
-
--- cat input[input_param=generate(output_param)] | cmd > output(output_param)
-funnel_rule what from_what output_param generate input_param cmd =
-	(Rule what ( funnel  from_what output_param generate input_param cmd))
-
--- simple cat input | cmd > output
-tranform_rule output input cmd =
-	(Rule output (\params -> ([substitute input params] , cmd)))
+import System.Process
+import Text.Printf
+import Data.List
 
 
---kpi_home = "/var/log/scribe/kpi/"
-kpi_home = "/Users/hp/Documents/Pig/log/"
-active_home = "/Users/hp/Documents/Pig/"
+type Dependencies = [DepGraph]
+type Executable = File->IO String
 
-kpi f = fp $ kpi_home ++ f
-active f = fp $ active_home ++ f
+join delim l = concat (intersperse delim l)
 
+type CmdGen = [DepGraph] -> Cmd
 
-days_of_month::String->String->[String]
-days_of_month y m =  map show [1..1]
+--ux_command::String->[String]->Bool->CmdGen
+--ux_command cmd params run =  do
 
+type PipeCmd = [DepGraph]->String->Cmd
 
-type Comm = [File]->String
-cat::Comm
-cat inputs = "cat"
-
-get_uniq_users::Comm
-get_uniq_users inputs = "get_uniq_users"
-
-type Param = String
-year::Param 
-year = "year"
-
-month::Param
-month = "month"
-
-day::Param
-day = "day"
-
-(###)::File->Param->(File, Param)
-(###) f p = (f, p)
-
-(===)::Show a=>(File, String)->a->File
-(===) (f, p) v = substitute f (params_from_list [(p, (show v))])
-
-data Unit = F File | Fs [File] 
-
-kpi_file yr m d =
-	 F (kpi "kpi-$year-$month-$day_00000.gz")###year===yr###month===m###day===d
-
-daily_active_users yr m d =
-	get_uniq_users [ kpi_file yr m d ] 
-
--- like a rule without name
-monthly_active_users2 yr m =
-	cat [ daily_active_users yr m day |  day <- days_of_month yr m]
+ux_cmd::String->Cmd
+ux_cmd cmdS = \run -> do -- TODO: needs to be simplified. I just don't know haskell enough
+                        _ <- if run then do
+                               _ <- createProcess $ shell cmdS 
+                               return True
+                             else return False
+                        return cmdS
 
 
+ux_pipe::String->[String]->PipeCmd
+ux_pipe cmd params input o = ux_cmd cmdS
+            where 
+                cmdS =  "cat " ++ ( join " " (map output input) ) ++ " | " ++ cmd  ++ " " ++ ( join " " params) ++ " > " ++ o
+    
 
---r= funnel_rule monthly_active_users daily_active_users "day" days_of_month "month" "cat"
---r2 = tranform_rule daily_active_users kpi_file "get_uniq_users_stream"
---rules = [r2, r]
+cp::[DepGraph]->File->Cmd
+-- furdeni akarok, most ez tul van altalanositva, ezert ez lista bemenetu, pedig a copy csak sima fajl kene
+-- volt egy valtozat, amikor sima fajl is lehetett bemenet, de aztan azt hittem, h mindennel lehet lista a bemenet
+-- mondjuk a copy is lehet concat single fajl
+cp i o = ux_cmd ("cp "  ++ (output $ head i ) ++ " " ++ o)
 
-target = monthly_active_users2 "2012" "07"
+grep::String->PipeCmd
+grep pat  = ux_pipe "grep" [pat] 
+
+uniq::PipeCmd
+uniq = ux_pipe "sort | uniq" [] 
 
 
-print_rules rules =
-	mapM_ print rules
+rule::[DepGraph] -> PipeCmd -> File -> DepGraph
+rule i =
+    \cmd ->
+            \o ->
+                GeneratedFile i o (cmd i o)
 
-main = do
-	--print (create_string_template "c")
-	--print (create_string_template "c$date")
-	--print (create_string_template "c$date=1")
-	print "target"
+napi_log::Int->Int->Int->DepGraph
+napi_log y m d = -- should be guards
+    if (y, m, d) == (2012,4, 19) then
+        InputFile $ printf "~/Documents/Pig/log/kpi-%04d-%02d-%02d_00000" y m d 
+    else
+        rule [napi_log 2012 4 19] cp (printf "~/Documents/Pig/log/kpi_gen-%04d-%02d-%02d_00000" y m d )
+
+user y m d = rule [napi_log y m d] (grep "3") (printf "~/Documents/Pig/log/user-%04d-%02d-%02d_00000" y m d )
+monthly_user y m  = rule [user y m d | d <- day_of_month y m] uniq (printf "~/Documents/Pig/log/monthly-%04d-%02d" y m  )
+
+day_of_month y m = [1..31]
+
+
+
+main = do 
+    g <- select $ monthly_user 2012 04 
+    g2 <- execution g
+    mapM_  ( (execute True)) g2
+    

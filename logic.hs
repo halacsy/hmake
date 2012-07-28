@@ -13,14 +13,8 @@ cat user-$y-$m-$d=(day_of_month $y $m) | sort | uniq > monthy-user-$y-$m
 -- van-e output? meg van-e minden input
 -- le_kell_e_futtatni::String->[String]->IO Bool
 
-type Cmd = ()-> IO String 
+type Cmd = Bool -> IO String 
 type File = String
-isMoreRecent (dep:deps) reference = True
-
-generateCommand deps myOutput cmd
-  | deps `isMoreRecent` myOutput = [cmd]
-  | otherwise                    = []
-
 
 
 data DepGraph = 
@@ -31,9 +25,11 @@ output::DepGraph->File
 output (InputFile f) = f
 output (GeneratedFile _ f _)  = f
 
+
+
 have_to_generate::File->[DepGraph]->IO Bool
-have_to_generate "user-2012-5-1" _ = return True
-have_to_generate _ _ = return False
+--have_to_generate "user-2012-5-1" _ = return Fa
+have_to_generate _ _ = return True
 
 
 -- selects subgraph which should be executed
@@ -60,48 +56,20 @@ select (GeneratedFile deps output cmd) =
 
 
 
-execution::DepGraph->IO [([File], Cmd, File) ]
+execution::DepGraph->IO [Cmd]
 execution (InputFile _) = return []
 execution (GeneratedFile deps o cmd)  = do
         c <- sequence $ map execution deps
-        return ( (flatten c) ++ [ (inputs, cmd, o )])
+        return ( (flatten c) ++ [ cmd ])
         where
             flatten :: [[a]] -> [a]
             flatten l = foldl (++) [] l
             inputs = map output deps
 
 
-napi_log y m d = InputFile $ "napi_log-" ++ show y ++ "-" ++ show m ++ "-" ++ show d
-
-user y m d = GeneratedFile deps myOutput cmd
-  where
-    cmd = grep_command (napi_log y m d)
-    deps = [napi_log y m d]
-    myOutput = "user-" ++ show y ++ "-" ++ show m ++ "-" ++ show d
-
-grep_command::DepGraph->()->IO String
-grep_command (InputFile f) _ = return ("grep " ++ f)
-
-monthly_user y m = GeneratedFile deps myOutput cmd
-  where
-    cmd = \_ -> return "concat"
-    deps = [user y m d | d <- day_of_month y m]
-    myOutput = "monthly-user-" ++ show y ++ "-" ++ show m
-
-day_of_month y m = [1..2]
-
-execute:: ([File], Cmd, File) -> IO String
-execute (inputs, cmd, o) = do
-    r <- cmd ()
+execute::   Bool->Cmd -> IO String
+execute run cmd = do
+    r <- cmd run
     print r
     return r
 
-a::()->IO String
-a _ = return "hello"
-
-main = do 
-    g <- select $ monthly_user 2012 5
-    g2 <- execution g
-    e <- a ()
-    print e
-    mapM_  execute g2
