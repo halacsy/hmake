@@ -8,7 +8,7 @@ module Unix (
     )
 
 where
-import Logic
+import Graph
 --import Parser
 
 import System.Process
@@ -26,7 +26,7 @@ type CmdGen = [DepGraph] -> Cmd
 --ux_command::String->[String]->Bool->CmdGen
 --ux_command cmd params run =  do
 
-type PipeCmd = [DepGraph]->String->Cmd
+type PipeCmd = [DepGraph]->File->Cmd
 
 ux_cmd::String->Cmd
 ux_cmd cmdS = \run -> do -- TODO: needs to be simplified. I just don't know haskell enough
@@ -48,18 +48,29 @@ ux_pipe cmd params input o = ux_cmd cmdS
                 cmdS =  "cat " ++ ( join " " (map output input) ) ++ " | " ++ cmd  ++ " " ++ ( join " " params) ++ " > " ++ o
     
 
-cp::[DepGraph]->File->Cmd
+_cp::PipeCmd
 -- furdeni akarok, most ez tul van altalanositva, ezert ez lista bemenetu, pedig a copy csak sima fajl kene
 -- volt egy valtozat, amikor sima fajl is lehetett bemenet, de aztan azt hittem, h mindennel lehet lista a bemenet
 -- mondjuk a copy is lehet concat single fajl
-cp i o = ux_cmd ("cp "  ++ (output $ head i ) ++ " " ++ o)
+_cp i o = ux_cmd ("cp "  ++ (output $ head i ) ++ " " ++ o)
 
-grep::String->PipeCmd
-grep pat  = ux_pipe "grep" [pat] 
+_grep::String->PipeCmd
+_grep pat  = ux_pipe "grep" [pat] 
 
-uniq::PipeCmd
-uniq = ux_pipe "sort | uniq" [] 
+_uniq::PipeCmd
+_uniq = ux_pipe "sort | uniq" [] 
 
 
 ux_rule::[DepGraph] -> PipeCmd -> File -> DepGraph
 ux_rule i cmd o = GeneratedFile i o (cmd i o)
+
+type PipeGen = [DepGraph]->File->DepGraph
+
+grep::String->PipeGen
+grep  p i o = ux_rule i (_grep p) o
+
+cp::PipeGen
+cp i o = ux_rule i _cp o
+
+uniq::PipeGen
+uniq i o = ux_rule i _uniq o
