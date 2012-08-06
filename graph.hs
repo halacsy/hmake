@@ -1,4 +1,4 @@
-module Logic where
+module Graph where
 import Data.Time.LocalTime
 
 {-# LANGUAGE NoMonomorphismRestriction #-}
@@ -20,6 +20,10 @@ type File = String
 data DepGraph = 
 	InputFile File |
 	GeneratedFile [DepGraph] File Cmd 
+
+-- this is other viewpoint -> a GenNode gets input, you name the output and gives DepGraph
+-- which can connected
+type GenNode = [DepGraph]->File->DepGraph
 
 output::DepGraph->File
 output (InputFile f) = f

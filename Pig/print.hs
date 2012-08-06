@@ -46,6 +46,9 @@ pprint_sub v  e fname by by_or_generate = (aux subv e) ++ "\n" ++ v ++ " = " ++ 
 
 aux::String->PigExpr->String 
 aux v (Load name _) = v ++ " = LOAD '" ++ name ++ "';";
+aux v (Store name e) =  (aux subv e) ++ "\n" ++ "STORE " ++ subv ++ " INTO '" ++ name ++ "';"
+						where subv = v ++ head v:""
+
 aux v (Group by  e) = pprint_sub v e "GROUP" (pprint by)  "BY"
 aux v (Filter cond e) = pprint_sub v e "FILTER" (pprint cond) "BY"
 aux v (Foreach e gen) = pprint_sub v e "FOREACH" (pprint gen) "GENERATE"

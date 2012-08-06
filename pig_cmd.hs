@@ -1,6 +1,7 @@
 import Pig.Dsl
 import Pig.Print
 import Pig.Language
+import Graph hiding (select)
 
 import System.IO
 import System.Process
@@ -29,12 +30,30 @@ executePig x = do
     _ <- createProcess $ shell ("pig -f " ++ fn)
     return "ok"
     
+pig_cmd::PigExpr->Cmd
+pig_cmd expr execute =
+	if execute then
+		executePig expr
+	else
+		return $ pretty_print expr
+
+pig::PFilter->GenNode
+pig exp inputs o = GeneratedFile inputs o cmd
+	where 
+		cmd = pig_cmd ( exp ->> (store o) $ load i) 
+		i = head ( map output inputs )
+
 one::Int
 one = 1
 chain =  select 12 Eq "show_kpi" ->> cut [9] ->> select 1 LtE "1300000" ->> freq 1 ->> select 2 Eq one ->> cut [1]
 x = chain $ load "VACAK1"
 
+y = pig chain [InputFile "hello"] "hallo"
+
+e::DepGraph->IO String
+e (GeneratedFile _ _ cmd) = cmd True
+
 main = do 
-    res <- executePig x 
+    res <- e y
     print res
     

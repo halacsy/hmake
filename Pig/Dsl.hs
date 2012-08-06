@@ -1,6 +1,6 @@
 module Pig.Dsl 
 (
-	group, filter, cut, freq, select, (->>), load
+	group, filter, cut, freq, select, (->>), load, store, PFilter
 )
 where
 import Pig.Language	
@@ -14,6 +14,8 @@ type PFilter = PigExpr->PigExpr
 load::String->PigExpr
 load s =  Load s Nothing
 
+store::String->PFilter
+store s = Store s
 
 --(.) :: (b -> c) -> (a -> b) -> a -> c
 -- (a -> b) -> a -> b

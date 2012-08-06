@@ -147,3 +147,11 @@ fp s =
     (create_file name file_name_generator  params (params_from_list kvs), fname, pexpr)
    
 
+
+
+
+chain =  select 12 Eq "show_kpi" ->> cut [9] ->> select 1 LtE "1300000" ->> freq 1 ->> select 2 Eq 1 ->> cut [1]
+x = chain $ load "VACAK"
+
+main = do 
+    putStrLn (pig_print x)

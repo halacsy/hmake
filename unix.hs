@@ -64,13 +64,12 @@ _uniq = ux_pipe "sort | uniq" []
 ux_rule::[DepGraph] -> PipeCmd -> File -> DepGraph
 ux_rule i cmd o = GeneratedFile i o (cmd i o)
 
-type PipeGen = [DepGraph]->File->DepGraph
 
-grep::String->PipeGen
+grep::String->GenNode
 grep  p i o = ux_rule i (_grep p) o
 
-cp::PipeGen
+cp::GenNode
 cp i o = ux_rule i _cp o
 
-uniq::PipeGen
+uniq::GenNode
 uniq i o = ux_rule i _uniq o
