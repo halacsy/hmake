@@ -39,9 +39,9 @@ have_to_generate _ _ = return True
 -- selects subgraph which should be executed
 -- return either InputFile if no execution needed
 -- or GeneratedFile otherwise
-select::DepGraph->IO DepGraph
-select (InputFile f) = return $ InputFile f
-select (GeneratedFile deps output cmd) = 
+reduce::DepGraph->IO DepGraph
+reduce (InputFile f) = return $ InputFile f
+reduce (GeneratedFile deps output cmd) = 
 		do
 			-- this must be executed iif output is too old
             too_old <- have_to_generate output deps
