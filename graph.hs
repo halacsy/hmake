@@ -3,7 +3,6 @@ import Data.Time.LocalTime
 
 {-# LANGUAGE NoMonomorphismRestriction #-}
 
-
 {-
 cat napi_log-$y-$m-$d | grep "user" > user-$y-$m-$d
 cat user-$y-$m-$d=(day_of_month $y $m) | sort | uniq > monthy-user-$y-$m
