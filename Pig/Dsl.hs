@@ -46,7 +46,7 @@ COUNT(relevant_shows.user_id) as showcount;
 -}
 
 freq::Int->PFilter
-freq col sub = Foreach groupped (Tuple [Positional 1, (Count (Positional 2))]) 
+freq col sub = Foreach groupped (Tuple [Positional 0, (Count (Positional 1))]) 
 	where
 		groupped = Group (Positional col) sub
 

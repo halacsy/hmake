@@ -46,7 +46,7 @@ reduce (GeneratedFile deps output cmd) =
 			-- this must be executed iif output is too old
             too_old <- have_to_generate output deps
             --  any of it's child must be genereted
-            childs <-  sequence $ map select deps
+            childs <-  sequence $ map reduce deps
             let child_to_gen = filter generated childs
             if (null child_to_gen) && (not too_old) then
                     return (InputFile output)
@@ -74,6 +74,6 @@ execution (GeneratedFile deps o cmd)  = do
 execute::   Bool->Cmd -> IO String
 execute run cmd = do
     r <- cmd run
-    print r
+    putStrLn r
     return r
 

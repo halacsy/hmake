@@ -45,8 +45,8 @@ pprint_sub v  e fname by by_or_generate = (aux subv e) ++ "\n" ++ v ++ " = " ++ 
 						where subv = v ++ head v:""
 
 aux::String->PigExpr->String 
-aux v (Load name _) = v ++ " = LOAD '" ++ name ++ "';";
-aux v (Store name e) =  (aux subv e) ++ "\n" ++ "STORE " ++ subv ++ " INTO '" ++ name ++ "';"
+aux v (Load name _) = v ++ " = LOAD '" ++ name ++ "' USING PigStorage(' ');";
+aux v (Store name e) =  (aux subv e) ++ "\n" ++ "STORE " ++ subv ++ " INTO '" ++ name ++ "' USING PigStorage(' ');"
 						where subv = v ++ head v:""
 
 aux v (Group by  e) = pprint_sub v e "GROUP" (pprint by)  "BY"
