@@ -20,10 +20,15 @@ instance  Pprint ComparisonOperator where
 	pprint LtE = " <= "
 	pprint GtE = " >= "
 	pprint Matches = " matches "
-	
+
+instance Pprint BoolOperator where
+	pprint Or = "OR"
+	pprint And = "AND"
+
 instance   Pprint Expr where
-	pprint (BoolExpr op exp1 exp2) = pprint exp1 ++ pprint op ++ pprint exp2
-	pprint (ArithExpr op exp1 exp2) = pprint exp1 ++ pprint op ++ pprint exp2
+	pprint (CompExpr op exp1 exp2) = "(" ++ pprint exp1 ++ pprint op ++ pprint exp2 ++ ")"
+	pprint (ArithExpr op exp1 exp2) = "(" ++ pprint exp1 ++ pprint op ++ pprint exp2 ++ ")"
+	pprint (BoolExpr op exp1 exp2) = "(" ++ pprint exp1 ++ " " ++ pprint op ++ " " ++ pprint exp2 ++ ")"
 	pprint (Positional i) = "$" ++ show i
 	pprint (IntExpr i) = show i
 	pprint (StringExpr s) = "'" ++ s ++ "'"
@@ -48,7 +53,9 @@ aux::String->PigExpr->String
 aux v (Load name _) = v ++ " = LOAD '" ++ name ++ "' USING PigStorage(' ');";
 aux v (Store name e) =  (aux subv e) ++ "\n" ++ "STORE " ++ subv ++ " INTO '" ++ name ++ "' USING PigStorage(' ');"
 						where subv = v ++ head v:""
-
+aux v (Distinct e) = (aux subv e) ++ "\n" ++ v ++ "= DISTINCT " ++ subv ++ ";"
+						where subv = v ++ head v:""
+						
 aux v (Group by  e) = pprint_sub v e "GROUP" (pprint by)  "BY"
 aux v (Filter cond e) = pprint_sub v e "FILTER" (pprint cond) "BY"
 aux v (Foreach e gen) = pprint_sub v e "FOREACH" (pprint gen) "GENERATE"

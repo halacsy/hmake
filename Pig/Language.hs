@@ -6,7 +6,8 @@ type Col = String
 
 data Expr  =  IntExpr Int
            |  StringExpr String
-           |  BoolExpr ComparisonOperator Expr Expr
+           |  CompExpr ComparisonOperator Expr Expr
+           |  BoolExpr BoolOperator Expr Expr
            |  ArithExpr ArithmeticOperator Expr Expr
            |  Positional Int
            |  Tuple [Expr]
@@ -18,9 +19,9 @@ data ComparisonOperator = Eq | Neq | Lt | Gt | LtE | GtE | Matches deriving (Sho
 
 
 data ArithmeticOperator = Add | Sub | Mul | Div | Mod | BinCond deriving (Show)
+data BoolOperator = And | Or deriving (Show)
 
-
-data PigExpr = Load String (Maybe Storage) | Group Expr PigExpr  | Filter Expr PigExpr | Foreach PigExpr Expr | Store String PigExpr deriving (Show)
+data PigExpr = Load String (Maybe Storage) | Distinct PigExpr | Group Expr PigExpr  | Filter Expr PigExpr | Foreach PigExpr Expr | Store String PigExpr deriving (Show)
 		
 
 

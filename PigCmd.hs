@@ -40,7 +40,6 @@ pig_cmd expr outFile execute =
     if execute then do
         -- we delete the file/directory as in pig/hadoop you can't overwrite
         output <- createProcess $ shell ("rm -rf " ++ outFile) 
-        print $ "itt" ++ outFile
         (fn, content, output) <- executePig expr
         return (fn ++ ":\n" ++ content ++ "\n-------------\n" ++ output)
     else
