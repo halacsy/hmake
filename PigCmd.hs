@@ -39,7 +39,7 @@ pig_cmd::PigExpr->String->Cmd
 pig_cmd expr outFile execute =
     if execute then do
         -- we delete the file/directory as in pig/hadoop you can't overwrite
-        output <- createProcess $ shell ("rm -rf " ++ outFile) 
+        output <- createProcess $ shell ("hadoop fs -rmr " ++ outFile) 
         (fn, content, output) <- executePig expr
         return (fn ++ ":\n" ++ content ++ "\n-------------\n" ++ output)
     else
