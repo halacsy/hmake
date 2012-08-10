@@ -31,7 +31,7 @@ target = monthly_uniq_users 2012 04
 runWithFlags f = do
     g <- reduce $ target
     g2 <- execute2 dontmake g
-    print g2
+    mapM print g2
     where
         dontmake = not $ DontMake `Data.List.elem` f
 
