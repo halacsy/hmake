@@ -32,14 +32,15 @@ dumpPigToTemp x = do
 executePig::PigExpr->IO (String, String, String)
 executePig x = do
     (fn, content) <- dumpPigToTemp x
-    output <- createProcess $ shell ("pig -f " ++ fn)
-    return (fn, content, "ok" )
+    (exit, out, err) <- readProcessWithExitCode "pig" ["-f" , fn] ""
+    return (fn, content, out )
     
 pig_cmd::PigExpr->String->Cmd
 pig_cmd expr outFile execute =
     if execute then do
         -- we delete the file/directory as in pig/hadoop you can't overwrite
-        output <- createProcess $ shell ("hadoop fs -rmr " ++ outFile) 
+        (exit, out, err)  <- readProcessWithExitCode "hadoop" ["fs", "-rmr", outFile] ""
+        print  $ "delete out" ++ outFile
         (fn, content, output) <- executePig expr
         return (fn ++ ":\n" ++ content ++ "\n-------------\n" ++ output)
     else
