@@ -19,7 +19,7 @@ daily_uniq_users ::Int->Int->Int->DepGraph
 daily_uniq_users  y m d = pig ( elem 5 kpiCodesWithUserActivity ->> distinct [6] )  [kpi_log y m d] (printf "/user/hp/daily_uniq_users-%04d-%02d-%02d" y m d )
 
 monthly_uniq_users::Int->Int->DepGraph
-monthly_uniq_users y m = pig (distinct [1]) [daily_uniq_users y m d | d <- day_of_month y m] (printf "/user/hp/monthly_uniq_users-%04d-%02d" y m  )
+monthly_uniq_users y m = pig (distinct [0]) [daily_uniq_users y m d | d <- day_of_month y m] (printf "/user/hp/monthly_uniq_users-%04d-%02d" y m  )
 day_of_month y m = [1..5]
 
 target = monthly_uniq_users 2012 04

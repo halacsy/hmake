@@ -32,6 +32,7 @@ dumpPigToTemp x = do
 executePig::PigExpr->IO (String, String, String)
 executePig x = do
     (fn, content) <- dumpPigToTemp x
+    putStrLn $ "executing\n" ++ content
     (exit, out, err) <- readProcessWithExitCode "pig" ["-f" , fn] ""
     return (fn, content, out )
     
