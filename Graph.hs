@@ -1,6 +1,9 @@
 module Graph where
 import Data.Time.LocalTime
-
+import System.Log.Logger
+import System.Log.Handler.Syslog
+import Prelude hiding (sequence)
+import Control.Monad.Parallel
 {-# LANGUAGE NoMonomorphismRestriction #-}
 
 {-
@@ -12,8 +15,12 @@ cat user-$y-$m-$d=(day_of_month $y $m) | sort | uniq > monthy-user-$y-$m
 -- van-e output? meg van-e minden input
 -- le_kell_e_futtatni::String->[String]->IO Bool
 
+myLog = warningM  "execution"
+
+
 type Cmd = Bool -> IO String 
 type File = String
+
 
 
 data DepGraph = 
@@ -57,8 +64,20 @@ reduce (GeneratedFile deps output cmd) =
                  generated _ = True 
 
 
+execute2::Bool->DepGraph->IO [String]
+execute2 _ (InputFile _)  = return []
+execute2 run (GeneratedFile deps o cmd)   = do
+        c <- sequence $ map (execute2 run) deps 
+        cmdS <- cmd False
+        myLog ("starting cmd" ++ cmdS)
+        my <- cmd run
+        myLog ("end of cmd" ++ cmdS)
 
-
+        return ( (flatten c) ++ [ my ])
+        where
+            flatten :: [[a]] -> [a]
+            flatten l = foldl (++) [] l
+           
 execution::DepGraph->IO [Cmd]
 execution (InputFile _) = return []
 execution (GeneratedFile deps o cmd)  = do
@@ -67,7 +86,7 @@ execution (GeneratedFile deps o cmd)  = do
         where
             flatten :: [[a]] -> [a]
             flatten l = foldl (++) [] l
-            inputs = map output deps
+
 
 
 execute::   Bool->Cmd -> IO String

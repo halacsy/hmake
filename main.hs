@@ -9,6 +9,8 @@ import Text.Printf
 import System( getArgs )
 import System.Console.GetOpt
 import qualified Data.List
+import System.Log.Logger
+import System.Log.Handler.Syslog
 
 kpiCodesWithUserActivity::[Int]
 kpiCodesWithUserActivity = [0,1, 2,3,4,5,6,10,11,13, 14, 17,19, 20, 21, 30]
@@ -28,12 +30,14 @@ target = monthly_uniq_users 2012 04
 
 runWithFlags f = do
     g <- reduce $ target
-    g2 <- execution g
-    mapM_  ( (execute dontmake )) g2
+    g2 <- execute2 dontmake g
+    print g2
     where
         dontmake = not $ DontMake `Data.List.elem` f
 
 main = do
+  updateGlobalLogger "execute" (setLevel DEBUG)
+  warningM "MyApp.Component2" "Something Bad is about to happen."
   args <- getArgs
   case getOpt RequireOrder options args of
     (flags, [],      [])     -> runWithFlags flags
