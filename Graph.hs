@@ -2,8 +2,8 @@ module Graph where
 import Data.Time.LocalTime
 import System.Log.Logger
 import System.Log.Handler.Syslog
-import Prelude hiding (sequence)
-import Control.Monad.Parallel
+--import Prelude hiding (sequence)
+--import Control.Monad.Parallel
 {-# LANGUAGE NoMonomorphismRestriction #-}
 
 {-
