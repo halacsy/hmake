@@ -10,7 +10,7 @@ import System( getArgs )
 import System.Console.GetOpt
 import qualified Data.List
 import System.Log.Logger
-import System.Log.Handler.Syslog
+
 
 kpiCodesWithUserActivity::[Int]
 kpiCodesWithUserActivity = [0,1, 2,3,4,5,6,10,11,13, 14, 17,19, 20, 21, 30]
