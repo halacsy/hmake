@@ -26,7 +26,6 @@ monthly_uniq_users y m = pig (distinct [0]) [daily_uniq_users y m d | d <- days_
 target = monthly_uniq_users 2012 04
 
 
-
 runWithFlags f = do
     g <- reduce $ target
     g2 <- execute2 dontmake g
