@@ -10,8 +10,7 @@ import System( getArgs )
 import System.Console.GetOpt
 import qualified Data.List
 import System.Log.Logger
-import System.Log.Handler.Syslog
-
+import Util
 kpiCodesWithUserActivity::[Int]
 kpiCodesWithUserActivity = [0,1, 2,3,4,5,6,10,11,13, 14, 17,19, 20, 21, 30]
 
@@ -21,8 +20,8 @@ daily_uniq_users ::Int->Int->Int->DepGraph
 daily_uniq_users  y m d = pig ( elem 5 kpiCodesWithUserActivity ->> distinct [6] )  [kpi_log y m d] (printf "/user/hp/daily_uniq_users-%04d-%02d-%02d" y m d )
 
 monthly_uniq_users::Int->Int->DepGraph
-monthly_uniq_users y m = pig (distinct [0]) [daily_uniq_users y m d | d <- day_of_month y m] (printf "/user/hp/monthly_uniq_users-%04d-%02d" y m  )
-day_of_month y m = [1..5]
+monthly_uniq_users y m = pig (distinct [0]) [daily_uniq_users y m d | d <- days_of_month y m] (printf "/user/hp/monthly_uniq_users-%04d-%02d" y m  )
+
 
 target = monthly_uniq_users 2012 04
 
