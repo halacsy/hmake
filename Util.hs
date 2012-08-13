@@ -2,7 +2,7 @@ module Util (days_of_month)
 where
 import Data.Time.Calendar
 
-days_of_month y m = [1 .. gregorianMonthLength y m]
+days_of_month y m = [1 .. gregorianMonthLength (fromIntegral y) m]
 
 {- 
 main = do 
