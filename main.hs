@@ -23,15 +23,22 @@ monthly_uniq_users::Int->Int->DepGraph
 monthly_uniq_users y m = pig (distinct [0]) [daily_uniq_users y m d | d <- days_of_month y m] (printf "/user/hp/monthly_uniq_users-%04d-%02d" y m  )
 
 
-target = monthly_uniq_users 2012 04
+three::Int
+three = 3
+daily_prezi_edits::Int->Int->Int->DepGraph
+daily_prezi_edits y m d = pig (eq 4 three ->> freq [5, 6]) [kpi_log y m d] (printf "/user/hp/daily_prezi_edits-%04d-%02d-%02d" y m d )
+
+
+
+target = daily_prezi_edits 2012 05 28
 
 
 runWithFlags f = do
     g <- reduce $ target
-    g2 <- execute2 dontmake g
+    g2 <- execute2 make g
     mapM print g2
     where
-        dontmake = not $ DontMake `Data.List.elem` f
+        make =  Make `Data.List.elem` f
 
 main = do
   updateGlobalLogger "execute" (setLevel DEBUG)
@@ -42,11 +49,11 @@ main = do
     (_,     nonOpts, [])     -> error $ "unrecognized arguments: " ++ unwords nonOpts
     (_,     _,       msgs)   -> error $ concat msgs ++ usageInfo header options
 
-data Flag = Version | DontMake deriving (Eq)
+data Flag = Version | Make deriving (Eq)
 
 options :: [OptDescr Flag]
 options = [ Option ['V'] ["version"] (NoArg Version) "show version number" ,
-            Option ['D'] ["dontmake"] (NoArg DontMake) "don't actually run commands   "]
+            Option ['M'] ["make"] (NoArg Make) "actually run commands   "]
 
 header = "Usage: main [OPTION...]"
 
