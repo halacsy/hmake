@@ -34,9 +34,8 @@ filter::Expr->PFilter
 filter e = Filter e
 
 cut::[Int]->PFilter
-cut cols e = Foreach e tup 
+cut cols = Foreach selectors 
     where
-        tup = Tuple selectors
         selectors = map Positional cols
 
 {- 
@@ -45,10 +44,10 @@ user_show_count = FOREACH user_shows GENERATE group as user_id,
 COUNT(relevant_shows.user_id) as showcount;
 -}
 
-freq::Int->PFilter
-freq col sub = Foreach groupped (Tuple [Positional 0, (Count (Positional 1))]) 
+freq::[Int]->PFilter
+freq col sub = Foreach [Positional 0, (Count (Positional 1))] groupped
     where
-        groupped = Group (Positional col) sub
+        groupped = Group (Tuple (map Positional col)) sub
 
 {-
 aw_users = FOREACH rows_with_users GENERATE p1 as user_id; 

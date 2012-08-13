@@ -33,7 +33,7 @@ instance   Pprint Expr where
 	pprint (IntExpr i) = show i
 	pprint (StringExpr s) = "'" ++ s ++ "'"
 	pprint (Tuple []) = ""
-	pprint (Tuple x) = let s = map pprint x in join ", " s  
+	pprint (Tuple x) = let s = map pprint x in "(" ++ (join ", " s) ++ ")"
 	pprint (Count e) = "COUNT(" ++ pprint e ++ ")"
 
 
@@ -58,7 +58,7 @@ aux v (Distinct e) = (aux subv e) ++ "\n" ++ v ++ "= DISTINCT " ++ subv ++ ";"
 						
 aux v (Group by  e) = pprint_sub v e "GROUP" (pprint by)  "BY"
 aux v (Filter cond e) = pprint_sub v e "FILTER" (pprint cond) "BY"
-aux v (Foreach e gen) = pprint_sub v e "FOREACH" (pprint gen) "GENERATE"
+aux v (Foreach relation e) = pprint_sub v e "FOREACH" (join ", " $ map pprint relation) "GENERATE"
 
 pretty_print::PigExpr->String
 pretty_print = aux "A"

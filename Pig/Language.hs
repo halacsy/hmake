@@ -21,7 +21,7 @@ data ComparisonOperator = Eq | Neq | Lt | Gt | LtE | GtE | Matches deriving (Sho
 data ArithmeticOperator = Add | Sub | Mul | Div | Mod | BinCond deriving (Show)
 data BoolOperator = And | Or deriving (Show)
 
-data PigExpr = Load String (Maybe Storage) | Distinct PigExpr | Group Expr PigExpr  | Filter Expr PigExpr | Foreach PigExpr Expr | Store String PigExpr deriving (Show)
+data PigExpr = Load String (Maybe Storage) | Distinct PigExpr | Group Expr PigExpr  | Filter Expr PigExpr | Foreach [Expr] PigExpr | Store String PigExpr deriving (Show)
 		
 
 
