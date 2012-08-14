@@ -22,34 +22,39 @@ data ArithmeticOperator = Add | Sub | Mul | Div | Mod | BinCond deriving (Show)
 data BoolOperator = And | Or deriving (Show)
 
 data PigExpr = Load String (Maybe Storage) | Distinct PigExpr | Group Expr PigExpr  | Filter Expr PigExpr | Foreach [Expr] PigExpr | Store String PigExpr deriving (Show)
-		
+        
 
 
 data Storage = PigStorage deriving (Show)
 
 type PError = String
 class PigValue a where
-	toPValue:: a -> Expr
-	fromPValue::Expr -> Either PError a
+    toPValue:: a -> Expr
+    fromPValue::Expr -> Either PError a
 
 instance PigValue Expr where
-	toPValue = id
-	fromPValue = Right
+    toPValue = id
+    fromPValue = Right
 
 instance PigValue Int where
-	toPValue = IntExpr
-	fromPValue (IntExpr i) = Right i
-	fromPValue _ = Left "not a pig int"
+    toPValue = IntExpr
+    fromPValue (IntExpr i) = Right i
+    fromPValue _ = Left "not a pig int"
 
 instance PigValue String where
-	toPValue = StringExpr
-	fromPValue (StringExpr s) = Right s
-	fromPValue  _ = Left "not a pig string"
+    toPValue = StringExpr
+    fromPValue (StringExpr s) = Right s
+    fromPValue  _ = Left "not a pig string"
 
 instance PigValue Integer where
-	toPValue = IntExpr . fromIntegral
-	fromPValue (IntExpr i) = Right $ fromIntegral i
-	fromPValue _ = Left "not a pig int"
+    toPValue = IntExpr . fromIntegral
+    fromPValue (IntExpr i) = Right $ fromIntegral i
+    fromPValue _ = Left "not a pig int"
+
+instance PigValue Double where
+    toPValue = undefined
+    fromPValue = undefined
+
 {- 
 client_log = LOAD '/scribe/client/' USING PigStorage(' ');
 show_kpi_rows = FILTER client_log BY $12 == 'show_kpi' ;
