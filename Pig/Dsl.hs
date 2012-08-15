@@ -1,6 +1,6 @@
 module Pig.Dsl 
 (
-    group, filter, cut, freq, (->>), load, store, elem, eq, distinct, PFilter
+    group, filter, cut, freq, (->>), load, store, elem, eq, distinct, sum_by, PFilter
 )
 where
 import Pig.Language 
@@ -45,9 +45,16 @@ COUNT(relevant_shows.user_id) as showcount;
 -}
 
 freq::[Int]->PFilter
-freq col sub = Foreach [Positional 0, (Count (Positional 1))] groupped
+freq col sub = Foreach [Flatten $ Positional 0, (Count (Positional 1))] groupped
     where
         groupped = Group (Tuple (map Positional col)) sub
+
+sum_by::Int->[Int]->PFilter
+sum_by x col sub = Foreach [Flatten $ Positional 0, (Sum (Positional 1))] groupped
+    where
+        groupped = Group (Tuple (map Positional mapped_cols)) sub'
+        sub' = cut (col ++ [x]) sub
+        mapped_cols = [0.. (length col - 1)]
 
 {-
 aw_users = FOREACH rows_with_users GENERATE p1 as user_id; 

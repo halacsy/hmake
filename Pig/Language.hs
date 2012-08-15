@@ -11,7 +11,10 @@ data Expr  =  IntExpr Int
            |  ArithExpr ArithmeticOperator Expr Expr
            |  Positional Int
            |  Tuple [Expr]
+           |  Flatten Expr
+           |  Sum Expr  
            |  Count Expr deriving (Show)
+
 
 
 data ComparisonOperator = Eq | Neq | Lt | Gt | LtE | GtE | Matches deriving (Show)

@@ -35,7 +35,8 @@ instance   Pprint Expr where
 	pprint (Tuple []) = ""
 	pprint (Tuple x) = let s = map pprint x in "(" ++ (join ", " s) ++ ")"
 	pprint (Count e) = "COUNT(" ++ pprint e ++ ")"
-
+	pprint (Sum e) = "COUNT(" ++ pprint e ++ ")"
+	pprint (Flatten e) = "FLATTEN(" ++ pprint e ++ ")"
 
 instance  Pprint ArithmeticOperator where
 	pprint Add = "+"
