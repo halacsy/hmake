@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TypeSynonymInstances #-}
+module Language where
 import Data.Maybe
 import Prelude hiding (filter)
 data Exp = IA Int | SA String | Sub Exp Exp | Selector Selector | Sum Selector | Count Selector deriving (Show, Eq)
@@ -13,16 +14,19 @@ data Condition = Comp ComparisonOperator Exp Exp | And Condition Condition | Or 
 
 
 
-data Typ = I | S | L | T RTyp | B RTyp deriving (Show, Eq)
+data Typ = I | S | L | T Schema | B Schema deriving (Show, Eq)
 type Name = Maybe String
 type NamedT = (Name, Typ)
-type RTyp = [NamedT]
+type Schema = [NamedT]
 
 
 
 data PipeCmd = Generate [Exp] Pipe | GroupBy [Exp] Pipe | Filter Condition Pipe | Load String deriving (Show)
 
-type Pipe = (RTyp,PipeCmd)
+type Pipe = (Schema,PipeCmd)
+
+schema::Pipe->Schema
+schema (s, _) = s
 
 instance Monad (Either String) where
   return v = Right v
@@ -31,8 +35,8 @@ instance Monad (Either String) where
   (Right v) >>= f = f v
 
 
-type PRTyp = Either String RTyp
-myConcat::PRTyp ->PRTyp ->PRTyp 
+type PSchema = Either String Schema
+myConcat::PSchema ->PSchema ->PSchema 
 myConcat (Left s) _ = Left s
 myConcat _ (Left s ) = Left s
 myConcat (Right t1) (Right t2) = (Right (t1 ++t2)) 
@@ -94,9 +98,9 @@ filter::Condition->Pipe->Either String Pipe
 filter cond p@(t, _) = -- TODO CHECK THE CONDITIONS! 
                         Right (t, Filter cond p)
 
-load::String->RTyp->Either String Pipe
+load::String->Schema->Either String Pipe
 load s t = Right (t, Load s)
-
+{- 
 a::Either String Pipe
 a =  load "vacak" [(Just "user_id", I), (Just "prezi_id", S), (Just "freq", I)] 
       >>= generate [Selector (Pos 1), Selector (Name "freq")] 
@@ -109,3 +113,4 @@ main = do
     case a of
         Left s -> print s
         Right p -> print p
+-}
