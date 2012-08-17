@@ -1,21 +1,24 @@
 module Pig.Dsl 
 (
-    group, filter, cut, freq, (->>), load, store, elem, eq, distinct, sum_by, PFilter
+    group_by, load, (->>)
+    {- , filter, cut, freq, store, elem, eq, distinct, sum_by, PFilter -}
 )
 where
 import Pig.Language 
 import Prelude hiding (filter, elem)
+import Pig.Types
 
 
+type TypedExpr = (RelationT, PigExpr)
 
-type PFilter = PigExpr->PigExpr
+type PFilter = TypedExpr->TypedExpr
 
 
-load::String->PigExpr
-load s =  Load s Nothing
+load::String->RelationT->TypedExpr
+load file r = (r,  Load file Nothing)
 
-store::String->PFilter
-store s = Store s
+store::String->TypedExpr->PigCommand
+store file (t, e) = Store file e
 
 --(.) :: (b -> c) -> (a -> b) -> a -> c
 -- (a -> b) -> a -> b
@@ -24,12 +27,15 @@ store s = Store s
 
 
 
-g::Int
-g= 5
 
-group::Expr->PFilter
-group e = Group e
+group_by::Expr->PFilter
+group_by by (t, e) = (t', Group by e)
+    where
+        t' = [keyT, groupT]
+        keyT = let (_, kt) = type_of_exp e t  in ("group", kt)
+        groupT = BT $ TT t
 
+{- 
 filter::Expr->PFilter
 filter e = Filter e
 
@@ -50,7 +56,7 @@ freq col sub = Foreach [Flatten $ Positional 0, (Count (Positional 1))] groupped
         groupped = Group (Tuple (map Positional col)) sub
 
 sum_by::Int->[Int]->PFilter
-sum_by x col sub = Foreach [Flatten $ Positional 0, (Sum (Positional 1))] groupped
+sum_by x col sub = Foreach [Flatten $ Positional 0, (Sum (NestedPositional 1 1))] groupped
     where
         groupped = Group (Tuple (map Positional mapped_cols)) sub'
         sub' = cut (col ++ [x]) sub
@@ -80,3 +86,4 @@ elem i l = filter $ opJoin Or expressions
         opJoin o (x:[]) = x
         opJoin o (x:xs) = BoolExpr o x $ opJoin o xs
         
+-}

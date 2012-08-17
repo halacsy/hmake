@@ -10,6 +10,7 @@ data Expr  =  IntExpr Int
            |  BoolExpr BoolOperator Expr Expr
            |  ArithExpr ArithmeticOperator Expr Expr
            |  Positional Int
+           |  NestedPositional Int Int -- for $1.$1
            |  Tuple [Expr]
            |  Flatten Expr
            |  Sum Expr  
@@ -18,14 +19,14 @@ data Expr  =  IntExpr Int
 
 
 data ComparisonOperator = Eq | Neq | Lt | Gt | LtE | GtE | Matches deriving (Show)
-
+data BoolOperator = And | Or deriving (Show)
 
 
 data ArithmeticOperator = Add | Sub | Mul | Div | Mod | BinCond deriving (Show)
-data BoolOperator = And | Or deriving (Show)
 
-data PigExpr = Load String (Maybe Storage) | Distinct PigExpr | Group Expr PigExpr  | Filter Expr PigExpr | Foreach [Expr] PigExpr | Store String PigExpr deriving (Show)
-        
+
+data PigExpr = Load String (Maybe Storage) | Distinct PigExpr | Group Expr PigExpr  | Filter Expr PigExpr | Foreach [Expr] PigExpr deriving (Show)
+data PigCommand =  Store String PigExpr deriving (Show)
 
 
 data Storage = PigStorage deriving (Show)

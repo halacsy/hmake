@@ -30,12 +30,14 @@ instance   Pprint Expr where
 	pprint (ArithExpr op exp1 exp2) = "(" ++ pprint exp1 ++ pprint op ++ pprint exp2 ++ ")"
 	pprint (BoolExpr op exp1 exp2) = "(" ++ pprint exp1 ++ " " ++ pprint op ++ " " ++ pprint exp2 ++ ")"
 	pprint (Positional i) = "$" ++ show i
+	pprint (NestedPositional i j) = "$" ++ show i ++ ".$" ++ show j
+
 	pprint (IntExpr i) = show i
 	pprint (StringExpr s) = "'" ++ s ++ "'"
 	pprint (Tuple []) = ""
 	pprint (Tuple x) = let s = map pprint x in "(" ++ (join ", " s) ++ ")"
 	pprint (Count e) = "COUNT(" ++ pprint e ++ ")"
-	pprint (Sum e) = "COUNT(" ++ pprint e ++ ")"
+	pprint (Sum e) = "SUM(" ++ pprint e ++ ")"
 	pprint (Flatten e) = "FLATTEN(" ++ pprint e ++ ")"
 
 instance  Pprint ArithmeticOperator where

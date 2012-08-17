@@ -23,6 +23,7 @@ kpi_prezi = 6
 base = "/Users/hp/"
 out_base name = base ++ name ++ "-%04d-%02d-%02d"
 
+
 daily_uniq_users ::DaylyFile
 daily_uniq_users  y m d = pig ( elem 4 kpiCodesWithUserActivity ->> distinct [5] )  
                               [kpi_log y m d] 
