@@ -1,21 +1,26 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 import Data.Maybe
-
-data Exp = IA Int | SA String | Sub Exp Exp | Selector Selector | Sum Exp | Count Exp deriving (Show, Eq)
+import Prelude hiding (filter)
+data Exp = IA Int | SA String | Sub Exp Exp | Selector Selector | Sum Selector | Count Selector deriving (Show, Eq)
 
 
 data Selector = Pos Int | Name String deriving (Show, Eq)
 
+data ComparisonOperator = Eq | Neq | Lt | Gt | LtE | GtE | Matches deriving (Show, Eq)
 
-data Typ = I | S | T RTyp | B RTyp deriving (Show, Eq)
+data Condition = Comp ComparisonOperator Exp Exp | And Condition Condition | Or Condition Condition deriving (Show, Eq)
+
+
+
+data Typ = I | S | L | T RTyp | B RTyp deriving (Show, Eq)
 type Name = Maybe String
 type NamedT = (Name, Typ)
 type RTyp = [NamedT]
 
 
 
-data PipeCmd = Generate [Exp] Pipe | GroupBy [Exp] Pipe | Load String deriving (Show)
+data PipeCmd = Generate [Exp] Pipe | GroupBy [Exp] Pipe | Filter Condition Pipe | Load String deriving (Show)
 
 type Pipe = (RTyp,PipeCmd)
 
@@ -35,6 +40,12 @@ myConcat (Right t1) (Right t2) = (Right (t1 ++t2))
 typeOf::Exp->Pipe->Either String NamedT
 typeOf (IA _) _ = Right (Nothing, I)
 typeOf (SA _) _ = Right (Nothing, S)
+typeOf (Count selector) p = -- exr must point to a BAG
+                            do
+                                t <- typeOf (Selector selector) p 
+                                case t of
+                                    (_, B _) -> return (Nothing, L)
+                                    otherwise -> fail $ "COUNT doesn't refer to a bag with " ++ (show selector) 
 typeOf (Sub exp1 exp2) p = do
      (_, t1) <- typeOf exp1 p
      (_, t2) <- typeOf exp2 p
@@ -79,12 +90,20 @@ groupBy xs p = case gen_type of
             groupValueType = let (orig_typ, _) = p in 
                              Right [(Just "elements", B orig_typ)]
 
+filter::Condition->Pipe->Either String Pipe
+filter cond p@(t, _) = -- TODO CHECK THE CONDITIONS! 
+                        Right (t, Filter cond p)
 
 load::String->RTyp->Either String Pipe
 load s t = Right (t, Load s)
 
 a::Either String Pipe
-a =  load "vacak" [(Just "user_id", I), (Just "prezi_id", S), (Just "freq", I)] >>= generate [Selector (Pos 1), Selector (Name "freq")] >>= groupBy [Selector (Pos 1)] 
+a =  load "vacak" [(Just "user_id", I), (Just "prezi_id", S), (Just "freq", I)] 
+      >>= generate [Selector (Pos 1), Selector (Name "freq")] 
+      >>= filter (Comp Eq (Selector (Pos 1)) (Selector (Pos 2)))
+      >>= groupBy [Selector (Pos 1)] 
+      >>= generate [Count (Pos 1)]
+
 
 main = do
     case a of
