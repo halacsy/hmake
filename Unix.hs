@@ -16,17 +16,17 @@ import Text.Printf
 import Data.List
 
 
---type Dependencies = [DepGraph]
+--type Dependencies = [Node]
 --type Executable = File->IO String
 
 join delim l = concat (intersperse delim l)
 
-type CmdGen = [DepGraph] -> Cmd
+type CmdGen = [Node] -> Cmd
 
 --ux_command::String->[String]->Bool->CmdGen
 --ux_command cmd params run =  do
 
-type PipeCmd = [DepGraph]->File->Cmd
+type PipeCmd = [Node]->File->Cmd
 
 ux_cmd::String->Cmd
 ux_cmd cmdS = \run -> do -- TODO: needs to be simplified. I just don't know haskell enough
@@ -61,8 +61,8 @@ _uniq::PipeCmd
 _uniq = ux_pipe "sort | uniq" [] 
 
 
-ux_rule::[DepGraph] -> PipeCmd -> File -> DepGraph
-ux_rule i cmd o = GeneratedFile i o (cmd i o)
+ux_rule::[Node] -> PipeCmd -> File -> Node
+ux_rule i cmd o = FileGenerator i o (cmd i o)
 
 
 grep::String->GenNode

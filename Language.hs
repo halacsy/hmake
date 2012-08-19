@@ -2,6 +2,7 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 module Language where
 import Data.Maybe
+import Control.Monad.Instances
 import Prelude hiding (filter)
 data Exp = IA Int | SA String | Sub Exp Exp | Selector Selector | Sum Selector | Count Selector deriving (Show, Eq)
 
@@ -19,21 +20,22 @@ type Name = Maybe String
 type NamedT = (Name, Typ)
 type Schema = [NamedT]
 
-
+type Transformer = Pipe->Either String Pipe
 
 data PipeCmd = Generate [Exp] Pipe | GroupBy [Exp] Pipe | Filter Condition Pipe | Load String deriving (Show)
 
 type Pipe = (Schema,PipeCmd)
 
-schema::Pipe->Schema
-schema (s, _) = s
+schemaOfPipe::Pipe->Schema
+schemaOfPipe (s, _) = s
 
+{-
 instance Monad (Either String) where
   return v = Right v
   fail s = Left s
   (Left s) >>= _ = Left s
   (Right v) >>= f = f v
-
+-}
 
 type PSchema = Either String Schema
 myConcat::PSchema ->PSchema ->PSchema 
@@ -64,7 +66,7 @@ typeOf (Selector (Name n)) (t, _) = case lookup (Just n) t of
                                         Just v -> return (Just n, v)
                                         Nothing -> fail $ "don't find: " ++ n
 
-generate::[Exp]->Pipe->Either String Pipe
+generate::[Exp]->Transformer
 generate xs p = case gen_type of 
         Left s -> Left s
         Right t ->  Right (t, Generate xs p)
@@ -72,7 +74,7 @@ generate xs p = case gen_type of
             gen_type::Either String [NamedT]
             gen_type =  sequence $ map (\t -> typeOf t p) xs
 
-groupBy::[Exp]->Pipe->Either String Pipe
+groupBy::[Exp]->Transformer
 groupBy xs p = case gen_type of
         Left s -> Left s
         Right t -> Right (t, GroupBy xs p)
@@ -94,13 +96,13 @@ groupBy xs p = case gen_type of
             groupValueType = let (orig_typ, _) = p in 
                              Right [(Just "elements", B orig_typ)]
 
-filter::Condition->Pipe->Either String Pipe
+filter::Condition->Transformer
 filter cond p@(t, _) = -- TODO CHECK THE CONDITIONS! 
                         Right (t, Filter cond p)
 
 load::String->Schema->Either String Pipe
 load s t = Right (t, Load s)
-{- 
+{-}
 a::Either String Pipe
 a =  load "vacak" [(Just "user_id", I), (Just "prezi_id", S), (Just "freq", I)] 
       >>= generate [Selector (Pos 1), Selector (Name "freq")] 

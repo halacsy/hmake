@@ -9,7 +9,7 @@ import Prelude hiding (elem)
 kpiCodesWithUserActivity::[Int]
 kpiCodesWithUserActivity = [0,1, 2,3,4,5,6,10,11,13, 14, 17,19, 20, 21, 30]
 
-type DaylyFile = Int->Int->Int->DepGraph
+type DaylyFile = Int->Int->Int->Node
 
 kpi_log y m d = InputFile $ printf "/scribe/kpi/kpi-%04d-%02d-%02d_00000" y m d
 
@@ -29,7 +29,7 @@ daily_uniq_users  y m d = pig ( elem 4 kpiCodesWithUserActivity ->> distinct [5]
                               [kpi_log y m d] 
                               (printf (out_base "daily_uniq_users") y m d )
 
-monthly_uniq_users::Int->Int->DepGraph
+monthly_uniq_users::Int->Int->Node
 monthly_uniq_users y m = pig (distinct [0])
                              [daily_uniq_users y m d | d <- days_of_month y m] 
                              (printf (out_base "monthly_uniq_users") y m  )

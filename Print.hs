@@ -1,6 +1,6 @@
 module Print 
 where
-
+import Prelude hiding (filter)
 import Language
 import Data.List hiding (filter, group, groupBy)
 
@@ -83,6 +83,7 @@ pp::Pipe->(Ident, String)
 pp (typ, (Load name )) = ("A", "A = LOAD '" ++ name ++ "' AS " ++ (schema2str typ))
 pp (_, (GroupBy exps pipe)) = pp_pipe (\i -> " GROUP " ++ i  ++ " BY " ++ (exps2str True exps)) pipe
 pp (_, (Generate exps pipe)) = pp_pipe (\i -> " FOREACH " ++ i  ++ " GENERATE " ++ (exps2str False exps)) pipe
+pp (_, (Filter cond pipe)) = pp_pipe (\i -> " FILTER " ++ i  ++ " BY " ++ (pprint cond)) pipe
 
 -- pp_pipe::Pipe->(Ident, String)
 pp_pipe f pipe = (ident, prev_text ++ "\n" ++ this_text)
@@ -94,17 +95,22 @@ pp_pipe f pipe = (ident, prev_text ++ "\n" ++ this_text)
 
 --pp (typ, (Generate exps pipe)) = 
 
+pigScriptWithStore::Pipe->String->String
+pigScriptWithStore pipe file = 
+    let (ident, str) = pp pipe in
+    str ++ "\n" ++ "STORE " ++ ident ++ " INTO '" ++ file ++ "';"
 
 -- Generate [Exp] Pipe | GroupBy [Exp] Pipe | Filter Condition Pipe | Load String deriving (Show)
-
+{- 
 a = load "vacak" [(Just "user_id", I), (Just "prezi_id", S), (Just "freq", I)]
       >>= generate [Selector (Pos 1), Selector (Name "freq")] 
     >>= groupBy [Selector (Pos 1), Selector (Pos 0)] 
-    
+    >>= filter (Comp Eq (Selector (Pos 1)) (Selector (Pos 2)))
 
 main = do
     case a of
         Left s -> print s
         Right p -> do
-            print (pp p) 
-            print $ schema2str $ schema p
+            putStr $ pigScriptWithStore p "output" 
+            print $ schema2str $ schemaOfPipe p
+-}
