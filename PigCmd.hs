@@ -6,52 +6,54 @@ import Graph
 import System.IO
 import System.Process
 import Prelude hiding (filter)
-import Data.List (intersperse)
+import Data.List (intersperse, foldl')
 import Data.Bits
 import Control.Monad.Instances
 import Print (pigScriptWithStore)
+import System.Exit
+
 join delim l = concat (intersperse delim l)
 
 {- writeFile :: FilePath -> String -> IO ()
 writeFile p = withFile p WriteMode . flip hPutStr
 -}
-{-}
+
 hash :: String -> Int
 hash  = abs . foldl' (\h c -> 33*h `xor` fromEnum c) 5381
 
 pig2File::String->String
 pig2File x =  "tmp" ++ (show . hash) x  ++ ".pig"
   
-dumpPigToTemp::Pipe->IO (String, String)
-dumpPigToTemp x = do
-    _ <- writeFile fp content 
-    return (fp, content)
+dumpPigToTemp::String->IO String
+dumpPigToTemp script = do
+    _ <- writeFile fp script 
+    return fp
        where
-       content = pretty_print x
-       fp = pig2File content
+       fp = pig2File script
+  
 
-executePig::Pipe->IO (String, String, String)
-executePig x = do
-    (fn, content) <- dumpPigToTemp x
-    putStrLn $ "executing\n" ++ content
-    (exit, out, err) <- readProcessWithExitCode "pig" ["-f" , fn] ""
-    return (fn, content, out )
-    -}
 pig_cmd::Pipe->String->Execution
 pig_cmd pipe outFile execute =
+    
     if execute then do
-        undefined
-        {- 
         -- we delete the file/directory as in pig/hadoop you can't overwrite
-        (exit, out, err)  <- readProcessWithExitCode "hadoop" ["fs", "-rmr", outFile] ""
+        (exit, out, err) <- readProcessWithExitCode "hadoop" ["fs", "-rmr", outFile] ""
         print  $ "delete out" ++ outFile
-        (fn, content, output) <- executePig expr
-        return (fn ++ ":\n" ++ content ++ "\n-------------\n" ++ output)
-        -}
+        executePig script
     else
-        return $ pigScriptWithStore pipe outFile
-
-
+        return $ script
+    where
+        script = pigScriptWithStore pipe outFile
+ 
+executePig::String->IO String
+executePig script  = do
+    fn <- dumpPigToTemp script
+    putStrLn $ "executing\n" ++ script
+    (exit, out, err) <- readProcessWithExitCode "pig" ["-f" , fn] ""
+    case exit of
+        ExitSuccess -> return $ "exit:" ++ (show exit) ++ "\nout:\n" ++ out ++ "\nerr:\n" ++ err
+        ExitFailure _ -> fail $ (show exit) ++ err
+ 
 
 -- this can be more haskell like. Creates from
 -- /Users/hp/log-1, /Users/hp/log-2 -> /Users/hp/log-{1,2}

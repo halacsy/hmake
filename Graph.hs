@@ -92,7 +92,7 @@ execute2 run (FileGenerator schema deps o cmd)   = do
         cmdS <- cmd False
         myLog ("starting cmd" ++ cmdS)
         my <- cmd run
-        myLog ("end of cmd" ++ cmdS)
+        myLog ("end of cmd" ++ my)
 
         return ( (flatten c) ++ [ my ])
         where
@@ -103,16 +103,12 @@ execution::Node->IO [Execution]
 execution (InputFile _ _) = return []
 execution (FileGenerator _ deps o cmd)  = do
         c <- sequence $ map execution deps
-        return ( (flatten c) ++ [ cmd ])
-        where
-            flatten :: [[a]] -> [a]
-            flatten l = foldl (++) [] l
-
+        return ( (concat c) ++ [ cmd ])
+      
 
 
 execute::   Bool->Execution -> IO String
 execute run cmd = do
     r <- cmd run
-    putStrLn r
     return r
 

@@ -80,7 +80,7 @@ exps2str False xs = join "," (map pprint xs)
 
 -- TODO: lehet ket load is
 pp::Pipe->(Ident, String)
-pp (typ, (Load name )) = ("A", "A = LOAD '" ++ name ++ "' AS " ++ (schema2str typ))
+pp (typ, (Load name )) = ("A", "A = LOAD '" ++ name ++ "' AS (" ++ (schema2str typ) ++ ");")
 pp (_, (GroupBy exps pipe)) = pp_pipe (\i -> " GROUP " ++ i  ++ " BY " ++ (exps2str True exps)) pipe
 pp (_, (Generate exps pipe)) = pp_pipe (\i -> " FOREACH " ++ i  ++ " GENERATE " ++ (exps2str False exps)) pipe
 pp (_, (Filter cond pipe)) = pp_pipe (\i -> " FILTER " ++ i  ++ " BY " ++ (pprint cond)) pipe
@@ -89,7 +89,7 @@ pp (_, (Filter cond pipe)) = pp_pipe (\i -> " FILTER " ++ i  ++ " BY " ++ (pprin
 pp_pipe f pipe = (ident, prev_text ++ "\n" ++ this_text)
                  where
                     (pident, prev_text) = pp pipe
-                    this_text = ident ++ " = " ++ (f ident) ++ ";"
+                    this_text = ident ++ " = " ++ (f pident) ++ ";"
                     ident = pident ++ "A"
 
 

@@ -11,7 +11,8 @@ import Graph
 runWithFlags f target = do
     g <- reduce $ target
     g2 <- execute2 make g
-    mapM print g2
+    -- mapM print g2
+    print "done"
     where
         make =  Make `Data.List.elem` f
 

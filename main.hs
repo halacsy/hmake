@@ -11,7 +11,16 @@ kpiCodesWithUserActivity = [0,1, 2,3,4,5,6,10,11,13, 14, 17,19, 20, 21, 30]
 
 type DaylyFile = Int->Int->Int->Either String Node
 
-kpi_log y m d = Right $ InputFile (as "user_id:int, prezi:id") (PigFile  $ printf "/scribe/kpi/kpi-%04d-%02d-%02d_00000" y m d)
+kpi_schema = [(Just "date", I), 
+              (Just "time", S), 
+              (Just "hostname", S), 
+              (Just "logtype", S), 
+              (Just "type", I), 
+              (Just "p1", I), 
+              (Just "p2", I), 
+              (Just "p3", I)] 
+
+kpi_log y m d = Right $ InputFile kpi_schema (PigFile  $ printf "/scribe/kpi/kpi-%04d-%02d-%02d_00000" y m d)
 
 
 
@@ -25,11 +34,11 @@ out_base name = base ++ name ++ "-%04d-%02d-%02d"
 
 
 daily_uniq_users ::DaylyFile
-daily_uniq_users  y m d = pig (  filter (Comp Eq (Selector (Pos 89)) (IA 3))  )  
+daily_uniq_users  y m d = pig (  filter (Comp Eq (Selector (Pos kpi_code)) (IA 3))  )  
                               [kpi_log y m d] 
                               (printf (out_base "daily_uniq_users") y m d )
 
-vacak y m d = pig (filter (Comp Eq (Selector (Pos 5)) (IA 3)))
+vacak y m d = pig (filter (Comp Eq (Selector (Pos 4)) (IA 3)))
 						[daily_uniq_users y m d]
 						(printf (out_base "vacak") y m d )                       
 {-
