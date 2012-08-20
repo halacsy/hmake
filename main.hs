@@ -25,7 +25,7 @@ out_base name = base ++ name ++ "-%04d-%02d-%02d"
 
 
 daily_uniq_users ::DaylyFile
-daily_uniq_users  y m d = pig (  filter (Comp Eq (Selector (Pos kpi_code)) (IA 3))  )  
+daily_uniq_users  y m d = pig (  filter (Comp Eq (Selector (Pos 89)) (IA 3))  )  
                               [kpi_log y m d] 
                               (printf (out_base "daily_uniq_users") y m d )
 

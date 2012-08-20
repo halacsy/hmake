@@ -15,7 +15,7 @@ data Condition = Comp ComparisonOperator Exp Exp | And Condition Condition | Or 
 
 
 
-data Typ = I | S | L | T Schema | B Schema deriving (Show, Eq)
+data Typ = I | S | L | Bool | T Schema | B Schema deriving (Show, Eq)
 type Name = Maybe String
 type NamedT = (Name, Typ)
 type Schema = [NamedT]
@@ -40,7 +40,7 @@ instance Monad (Either String) where
 as::String->Schema
 as str = [(Just "user_id", I), (Just "prezi_id", S), (Just "freq", I)] 
 
-  
+
 type PSchema = Either String Schema
 myConcat::PSchema ->PSchema ->PSchema 
 myConcat (Left s) _ = Left s
@@ -100,9 +100,17 @@ groupBy xs p = case gen_type of
             groupValueType = let (orig_typ, _) = p in 
                              Right [(Just "elements", B orig_typ)]
 
+typeOfCondition::Condition->Pipe->Either String [NamedT]
+typeOfCondition (Comp operator exp1 exp2) pipe = do
+            type1 <- typeOf exp1 pipe
+            type2 <- typeOf exp2 pipe
+            -- we are very strict here. No casting accepted!
+            if type1 == type2 then return [(Nothing, Bool)] else fail $ "can't compare " ++ (show type1) ++ " to " ++ (show type2)
+
 filter::Condition->Transformer
-filter cond p@(t, _) = -- TODO CHECK THE CONDITIONS! 
-                        Right (t, Filter cond p)
+filter cond p@(t, _) = do
+                  _ <- typeOfCondition cond p
+                  Right (t, Filter cond p)
 
 load::String->Schema->Either String Pipe
 load s t = Right (t, Load s)
