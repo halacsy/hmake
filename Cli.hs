@@ -1,5 +1,5 @@
 module Cli where
-import Pig.Language
+
 import Text.Printf
 import System( getArgs )
 import System.Console.GetOpt
@@ -15,7 +15,10 @@ runWithFlags f target = do
     where
         make =  Make `Data.List.elem` f
 
-doIt target = do
+doIt (Left error) =
+    fail error
+
+doIt (Right target) = do
   updateGlobalLogger "execute" (setLevel DEBUG)
   warningM "MyApp.Component2" "Something Bad is about to happen."
   args <- getArgs

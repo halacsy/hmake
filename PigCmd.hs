@@ -11,10 +11,11 @@ import Data.Bits
 import Control.Monad.Instances
 import Print (pigScriptWithStore)
 join delim l = concat (intersperse delim l)
-{-
+
 {- writeFile :: FilePath -> String -> IO ()
 writeFile p = withFile p WriteMode . flip hPutStr
 -}
+{-}
 hash :: String -> Int
 hash  = abs . foldl' (\h c -> 33*h `xor` fromEnum c) 5381
 
@@ -35,19 +36,22 @@ executePig x = do
     putStrLn $ "executing\n" ++ content
     (exit, out, err) <- readProcessWithExitCode "pig" ["-f" , fn] ""
     return (fn, content, out )
-    
-pig_cmd::Pipe->String->Cmd
-pig_cmd expr outFile execute =
+    -}
+pig_cmd::Pipe->String->Execution
+pig_cmd pipe outFile execute =
     if execute then do
+        undefined
+        {- 
         -- we delete the file/directory as in pig/hadoop you can't overwrite
         (exit, out, err)  <- readProcessWithExitCode "hadoop" ["fs", "-rmr", outFile] ""
         print  $ "delete out" ++ outFile
         (fn, content, output) <- executePig expr
         return (fn ++ ":\n" ++ content ++ "\n-------------\n" ++ output)
+        -}
     else
-        return $ pretty_print expr
+        return $ pigScriptWithStore pipe outFile
 
--}
+
 
 -- this can be more haskell like. Creates from
 -- /Users/hp/log-1, /Users/hp/log-2 -> /Users/hp/log-{1,2}
@@ -67,31 +71,29 @@ toGlob names =
               if all (\s-> pat == (take n s)) names then (aux (n + 1))  else n  - 1
 
 -- TODO: how to handle input error?
-pig::Transformer->[Node]->FileName->Either String Node
+pig::Transformer->[Either String Node]->FileName->Either String Node
 pig  _ [] _  = fail "empty list of input files"
 pig trans inputNodes o =
-    do{- 
+    do{- TODO
         -- inputs must have the same schema
         if not $ all ((==) inputSchema) $ map schemaOfNode inputNodes then
             fail "not the same schema at all input file"
         else
          -}   -- if there is an error in the script -> this fails
+            inputNodes' <- sequence inputNodes
+            let globbedInput = toGlob $ map nameOfFile $ getOutputFiles inputNodes'
+            let inputSchema = head $ map schemaOfNode inputNodes'
             pipe <- (load globbedInput inputSchema >>= trans)
-            let script = pigScriptWithStore pipe
             let outputSchema = schemaOfPipe pipe
-            let execution = undefined 
-            return (FileGenerator outputSchema inputNodes (PigFile o) execution)
-    where
-        inputFiles = getOutputFiles inputNodes
-        inputSchema = head $ map schemaOfNode inputNodes
-        globbedInput = toGlob $ map nameOfFile $ getOutputFiles inputNodes
-            
+            let execution = pig_cmd pipe o 
+            return (FileGenerator outputSchema inputNodes' (PigFile o) execution)
+     
 input = (InputFile ([(Just "user_id", I), (Just "linda", S), (Just "freq", I)] ) (PigFile "hello"))
 pig_command::Transformer
-pig_command = generate [(Selector (Pos 1))]
-
-main = do
+pig_command = generate [(Selector (Pos 3))]
+{-main = do
     print $ pig (pig_command) [input] "hallo"
+-}
 {-
 one::Int
 one = 1

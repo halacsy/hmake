@@ -37,6 +37,10 @@ instance Monad (Either String) where
   (Right v) >>= f = f v
 -}
 
+as::String->Schema
+as str = [(Just "user_id", I), (Just "prezi_id", S), (Just "freq", I)] 
+
+  
 type PSchema = Either String Schema
 myConcat::PSchema ->PSchema ->PSchema 
 myConcat (Left s) _ = Left s
