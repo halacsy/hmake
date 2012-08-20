@@ -4,6 +4,7 @@ module Language where
 import Data.Maybe
 import Control.Monad.Instances
 import Prelude hiding (filter)
+
 data Exp = IA Int | SA String | Sub Exp Exp | Selector Selector | Sum Selector | Count Selector deriving (Show, Eq)
 
 
@@ -100,12 +101,19 @@ groupBy xs p = case gen_type of
             groupValueType = let (orig_typ, _) = p in 
                              Right [(Just "elements", B orig_typ)]
 
+comparableTypes::NamedT->NamedT->Bool
+comparableTypes (_, typ1) (_, typ2) =  -- we are very strict here. No casting accepted! 
+            typ1 == typ2
+
 typeOfCondition::Condition->Pipe->Either String [NamedT]
 typeOfCondition (Comp operator exp1 exp2) pipe = do
             type1 <- typeOf exp1 pipe
             type2 <- typeOf exp2 pipe
             -- we are very strict here. No casting accepted!
-            if type1 == type2 then return [(Nothing, Bool)] else fail $ "can't compare " ++ (show type1) ++ " to " ++ (show type2)
+            if comparableTypes type1 type2 then 
+              return [(Nothing, Bool)] 
+            else 
+              fail $ "can't compare " ++ (show type1) ++ " to " ++ (show type2)
 
 filter::Condition->Transformer
 filter cond p@(t, _) = do
