@@ -80,7 +80,7 @@ exps2str False xs = join "," (map pprint xs)
 
 -- TODO: lehet ket load is
 pp::Pipe->(Ident, String)
-pp (typ, (Load name )) = ("A", "A = LOAD '" ++ name ++ "' AS (" ++ (schema2str typ) ++ ");")
+pp (typ, (Load name )) = ("A", "A = LOAD '" ++ name ++ "' USING PigStorage(' ') AS (" ++ (schema2str typ) ++ ");")
 pp (_, (GroupBy exps pipe)) = pp_pipe (\i -> " GROUP " ++ i  ++ " BY " ++ (exps2str True exps)) pipe
 pp (_, (Generate exps pipe)) = pp_pipe (\i -> " FOREACH " ++ i  ++ " GENERATE " ++ (exps2str False exps)) pipe
 pp (_, (Filter cond pipe)) = pp_pipe (\i -> " FILTER " ++ i  ++ " BY " ++ (pprint cond)) pipe
@@ -98,7 +98,7 @@ pp_pipe f pipe = (ident, prev_text ++ "\n" ++ this_text)
 pigScriptWithStore::Pipe->String->String
 pigScriptWithStore pipe file = 
     let (ident, str) = pp pipe in
-    str ++ "\n" ++ "STORE " ++ ident ++ " INTO '" ++ file ++ "';"
+    str ++ "\n" ++ "STORE " ++ ident ++ " INTO '" ++ file ++ "' USING PigStorage(' ') ;"
 
 -- Generate [Exp] Pipe | GroupBy [Exp] Pipe | Filter Condition Pipe | Load String deriving (Show)
 {- 
