@@ -71,6 +71,15 @@ typeOf (Selector (Name n)) (t, _) = case lookup (Just n) t of
                                         Just v -> return (Just n, v)
                                         Nothing -> fail $ "don't find: " ++ n
 
+p0 = Selector (Pos 0)
+p1 = Selector (Pos 1)
+p2 = Selector (Pos 2)
+p3 = Selector (Pos 3)
+p4 = Selector (Pos 4)
+
+c::String->Exp
+c name = Selector (Name name)
+
 generate::[Exp]->Transformer
 generate xs p = case gen_type of 
         Left s -> Left s
