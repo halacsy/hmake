@@ -31,7 +31,7 @@ instance   Pprint Exp where
     pprint (SA s) = "'" ++ s ++ "'"
     pprint (Selector (Pos i)) = "$" ++ (show i)
     pprint (Selector (Name s)) = s
-    
+    pprint (Count e) = "COUNT(" ++ pprint (Selector e) ++ ")"
     {-
     pprint (CompExpr op exp1 exp2) = "(" ++ pprint exp1 ++ pprint op ++ pprint exp2 ++ ")"
     pprint (ArithExpr op exp1 exp2) = "(" ++ pprint exp1 ++ pprint op ++ pprint exp2 ++ ")"
@@ -59,7 +59,7 @@ typ2str I = "int"
 typ2str S = "bytearray"
 typ2str (B s) = "bag {"  ++ (schema2str s) ++ "}"
 typ2str (T s) = "tuple ("  ++ (schema2str s) ++ ")"
-
+typ2str L = "long"
 schema2str::Schema->String
 schema2str rtyp = join ", " $ map namedTyp2str rtyp
         where 
@@ -78,7 +78,14 @@ exps2str _ (x:[]) = (pprint x)
 exps2str True xs = "(" ++ join "," (map pprint xs) ++ ")"
 exps2str False xs = join "," (map pprint xs) 
 
-forechExps2Str xs = join "," (map (\(exp, name) -> pprint exp ++ " as " ++ name) xs)
+forechExps2Str xs = join "," (map printNamedExp xs)
+    where       
+        printNamedExp::(Exp, String)->String
+        -- pig doesn't like this:  AAAA =  FOREACH AAA GENERATE group as group,COUNT($1) as count;
+        printNamedExp ((Selector (Name s)), name) 
+                            | s == name = s
+                            | otherwise = s ++ " as " ++ name
+        printNamedExp (exp, name) = pprint exp ++ " as " ++ name
 
 -- TODO: lehet ket load is
 pp::Pipe->(Ident, String)

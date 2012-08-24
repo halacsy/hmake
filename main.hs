@@ -32,35 +32,36 @@ kpi_prezi = 6
 
 --base = "/user/hp/"
 base = "/Users/hp/"
-out_base name = base ++ name ++ "-%04d-%02d-%02d"
+out_base name = base ++ name 
 
 
 daily_uniq_users ::DaylyFile
 daily_uniq_users  y m d = pig ( filter ( c "type" `elem` kpiCodesWithUserActivity )  >>> select [(c "p1", "user_id")] >>> distinct )  
                               [kpi_log y m d] 
-                              (printf (out_base "daily_uniq_users") y m d )
+                              (printf (out_base "daily_uniq_users-%04d-%02d-%02d") y m d )
 
                        
 
 monthly_uniq_users::MonthlyFile
 monthly_uniq_users y m = pig (distinct )
                              [daily_uniq_users y m d | d <- days_of_month y m] 
-                             (printf (out_base "monthly_uniq_users") y m  )
-
-{-}
-daily_user_prezi_edit_freqs::DaylyFile
-daily_user_prezi_edit_freqs y m d = pig (eq kpi_code (3::Int) ->> freq [kpi_user, kpi_prezi]) 
-                              [vacak y m d] 
-                              (printf (out_base "daily_user_prezi_edit_freqs") y m d )
+                             (printf (out_base "monthly_uniq_users-%02d-%02d") y m  )
 
 
+daily_user_prezi_edits::DaylyFile
+daily_user_prezi_edits y m d = pig (filter (c "type" `eq` 3) >>> select [(c "p1", "user_id"), (c "p2", "prezi_id")]  >>> freq [(Name "user_id"), (Name "prezi_id")]) 
+                              [kpi_log y m d] 
+                              (printf (out_base "daily_user_prezi_edit_freqs-%04d-%02d-%02d") y m d )
+
+daily_user_prezi_edits2 y m d = pig distinct [daily_user_prezi_edits y m d] (printf (out_base "cucc"))
+{-
 daily_user_save_counts::DaylyFile
 daily_user_save_counts y m d = pig (sum_by 2 [0]) 
                                [daily_user_prezi_edit_freqs y m d]
                                (printf (out_base "daily_user_save_counts" ) y m d )
 -}
 main = do
-  doIt $ monthly_uniq_users 2012 05 
+  doIt $ daily_user_prezi_edits2 2012 05 22
 
 
     

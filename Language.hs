@@ -5,7 +5,7 @@ import Data.Maybe
 import Control.Monad.Instances
 import Prelude hiding (filter, elem)
 
-data Exp = IA Int | SA String | Sub Exp Exp | Selector Selector | Sum Selector | Count Selector deriving (Show, Eq)
+data Exp = IA Int | SA String | Sub Exp Exp | Selector Selector | Sum Selector | Count Selector | Flatten Selector deriving (Show, Eq)
 
 
 data Selector = Pos Int | Name String deriving (Show, Eq)
@@ -26,6 +26,7 @@ type Transformer = Pipe->Either String Pipe
 data PipeCmd = Generate [(Exp, String)] Pipe | GroupBy [Exp] Pipe | Filter Condition Pipe | Distinct Pipe | Load String deriving (Show)
 
 type Pipe = (Schema,PipeCmd)
+
 
 instance Num Exp where
   (+) = undefined
@@ -167,6 +168,16 @@ load s t = Right (t, Load s)
 (>>>)::Transformer->Transformer->Transformer
 x >>> y = \p -> (Right p) >>= x >>= y
     
+{- 
+user_shows = GROUP relevant_shows BY user_id;
+user_show_count = FOREACH user_shows GENERATE group as user_id,
+COUNT(relevant_shows.user_id) as showcount;
+-}
+
+
+freq::[Selector]->Transformer
+freq col = groupBy (map Selector col) >>> select [(c "group", "group"), (Count  (Pos 1), "count") ]
+
 
 {-
 
