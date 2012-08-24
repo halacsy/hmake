@@ -38,20 +38,20 @@ out_base name = base ++ name
 
 
 daily_uniq_users ::DaylyFile
-daily_uniq_users  y m d = pig_node ((input $ (kpi_log y m d))
+daily_uniq_users  y m d = pig_node (input  (kpi_log y m d)
                                       >>= filter ( c "type" `elem` kpiCodesWithUserActivity )  
                                       >>= select [(c "p1", "user_id")] 
                                       >>= distinct )  
                               (printf (out_base "daily_uniq_users-%04d-%02d-%02d") y m d )
 
                        
-{-
+
 monthly_uniq_users::MonthlyFile
-monthly_uniq_users y m = pig (distinct )
-                             [daily_uniq_users y m d | d <- days_of_month y m] 
+monthly_uniq_users y m = pig_node ((union $ map input [daily_uniq_users y m d | d <- days_of_month y m]  )
+                                      >>= distinct)
                              (printf (out_base "monthly_uniq_users-%02d-%02d") y m  )
 
-
+{-
 daily_user_prezi_edits::DaylyFile
 daily_user_prezi_edits y m d = pig (filter (c "type" `eq` 3) >>> select [(c "p1", "user_id"), (c "p2", "prezi_id")]  >>> freq [(Name "user_id"), (Name "prezi_id")]) 
                               [kpi_log y m d] 
@@ -65,7 +65,7 @@ daily_user_save_counts y m d = pig (sum_by 2 [0])
                                (printf (out_base "daily_user_save_counts" ) y m d )
 -}
 main = do
-  doIt $ daily_uniq_users 2012 05 22
+  doIt $ monthly_uniq_users 2012 05 
 
 
     

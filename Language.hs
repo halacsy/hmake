@@ -26,11 +26,13 @@ data PipeCmd = Generate [(Exp, String)] Pipe
                | GroupBy [Exp] Pipe 
                | Filter Condition Pipe 
                | Distinct Pipe 
+               | Union [Pipe]
                | Node Node
                | Load String deriving (Show)
 
 getDependencies::PipeCmd->[Node]
 getDependencies (Node node) = [node]
+getDependencies (Union ps) = concatMap getPipeDependencies ps
 getDependencies (Generate _ p) = getPipeDependencies p
 getDependencies (GroupBy _ p) = getPipeDependencies p
 getDependencies (Filter _ p) = getPipeDependencies p
@@ -181,6 +183,16 @@ input (Left s) = Left s
 input (Right  node@(InputFile schema _ )) = Right (schema, Node node)
 input (Right node@(FileGenerator schema _ _ _ )) = Right (schema, Node node)
 
+union::[PipeE]->PipeE
+union [] = Left "empty Union"
+union ((Right x):[]) = Right x
+union ((Left s):[]) = Left s
+union xs = -- TODO check scheme equality
+      do 
+          p <- sequence xs
+          let schema = schemaOfPipe (head p)
+          return (schema, Union p)
+           
 (>>>)::Transformer->Transformer->Transformer
 x >>> y = \p -> (Right p) >>= x >>= y
     

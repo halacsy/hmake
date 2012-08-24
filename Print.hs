@@ -97,6 +97,31 @@ pp (_, (Filter cond pipe)) = pp_pipe (\i -> " FILTER " ++ i  ++ " BY " ++ (pprin
 pp (_, (Distinct pipe)) = pp_pipe (\i -> " DISTINCT " ++ i) pipe
 pp (_, (Node (InputFile typ (PigFile file) ))) = pp (typ, (Load file))
 
+pp (typ, (Union pipes)) = 
+    let inputNodes = map toNode pipes in
+    let globbedInput = toGlob $ map nameOfFile $ getOutputFiles inputNodes in
+    pp (typ, (Load globbedInput))
+        where 
+            toNode (_, (Node n)) = n
+            toNode _ = undefined
+
+-- this can be more haskell like. Creates from
+-- /Users/hp/log-1, /Users/hp/log-2 -> /Users/hp/log-{1,2}
+toGlob::[String]->String
+toGlob names =
+        let 
+            prefix = take prefix_len (head names)
+            remainders = map (drop prefix_len) names
+        in 
+            if length names > 1 then
+                prefix ++ "{" ++ (join "," remainders) ++ "}"
+            else
+                head names
+    where
+        prefix_len = if length names > 1 then aux 1 else 0
+        aux n = let pat = take n (head names) in
+              if all (\s-> pat == (take n s)) names then (aux (n + 1))  else n  - 1
+
 -- pp_pipe::Pipe->(Ident, String)
 pp_pipe f pipe = (ident, prev_text ++ "\n" ++ this_text)
                  where

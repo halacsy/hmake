@@ -55,22 +55,8 @@ executePig script  = do
         ExitFailure _ -> fail $ (show exit) ++ err
  
 
--- this can be more haskell like. Creates from
--- /Users/hp/log-1, /Users/hp/log-2 -> /Users/hp/log-{1,2}
-toGlob::[String]->String
-toGlob names =
-        let 
-            prefix = take prefix_len (head names)
-            remainders = map (drop prefix_len) names
-        in 
-            if length names > 1 then
-                prefix ++ "{" ++ (join "," remainders) ++ "}"
-            else
-                head names
-    where
-        prefix_len = if length names > 1 then aux 1 else 0
-        aux n = let pat = take n (head names) in
-              if all (\s-> pat == (take n s)) names then (aux (n + 1))  else n  - 1
+
+{- 
 
 -- TODO: how to handle input error?
 pig::Transformer->[Either String Node]->FileName->Either String Node
@@ -90,7 +76,7 @@ pig trans inputNodes o =
             let execution = pig_cmd pipe o 
             return (FileGenerator outputSchema inputNodes' (PigFile o) execution)
      
-
+-}
 pig_node::Either String Pipe->String->Either String Node
 pig_node (Left s) _ = Left s
 pig_node (Right pipe) o = -- we need to find the dependencies
