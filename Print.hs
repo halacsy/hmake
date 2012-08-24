@@ -84,6 +84,7 @@ pp (typ, (Load name )) = ("A", "A = LOAD '" ++ name ++ "' USING PigStorage(' ') 
 pp (_, (GroupBy exps pipe)) = pp_pipe (\i -> " GROUP " ++ i  ++ " BY " ++ (exps2str True exps)) pipe
 pp (_, (Generate exps pipe)) = pp_pipe (\i -> " FOREACH " ++ i  ++ " GENERATE " ++ (exps2str False exps)) pipe
 pp (_, (Filter cond pipe)) = pp_pipe (\i -> " FILTER " ++ i  ++ " BY " ++ (pprint cond)) pipe
+pp (_, (Distinct pipe)) = pp_pipe (\i -> " DISTINCT " ++ i) pipe
 
 -- pp_pipe::Pipe->(Ident, String)
 pp_pipe f pipe = (ident, prev_text ++ "\n" ++ this_text)

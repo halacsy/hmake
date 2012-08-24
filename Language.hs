@@ -23,7 +23,7 @@ type Schema = [NamedT]
 
 type Transformer = Pipe->Either String Pipe
 
-data PipeCmd = Generate [Exp] Pipe | GroupBy [Exp] Pipe | Filter Condition Pipe | Load String deriving (Show)
+data PipeCmd = Generate [Exp] Pipe | GroupBy [Exp] Pipe | Filter Condition Pipe | Distinct Pipe | Load String deriving (Show)
 
 type Pipe = (Schema,PipeCmd)
 
@@ -149,18 +149,29 @@ filter cond p@(t, _) = do
                   _ <- typeOfCondition cond p
                   Right (t, Filter cond p)
 
+distinct::Pipe->Either String Pipe
+distinct p@(t, _ ) = Right (t, (Distinct p))
+
 load::String->Schema->Either String Pipe
 load s t = Right (t, Load s)
+
+(>>>)::Transformer->Transformer->Transformer
+x >>> y = \p -> (Right p) >>= x >>= y
+    
+
+{-
 
 a::Either String Pipe
 a =  load "vacak" [(Just "user_id", I), (Just "prezi_id", S), (Just "freq", I)] 
       >>= generate [Selector (Pos 1), Selector (Name "freq")] 
       >>= filter (elem p1 [1, 2, 5])
       >>= groupBy [Selector (Pos 1)] 
-      >>= generate [Count (Pos 1)]
+      >>= distinct
 
 
 main = do
     case a of
         Left s -> print s
         Right p -> print p
+
+   -}     
