@@ -18,9 +18,23 @@ data Condition = Comp ComparisonOperator Exp Exp | And Condition Condition | Or 
 
 type Pipe = (Schema,PipeCmd)
 
+class Feedable a where
+  toPipe :: a -> Pipe
+         
+instance Feedable Node where
+  toPipe node@(InputFile schema _ ) = (schema, Node node)
+  toPipe node@(FileGenerator schema _ _ _ ) = (schema, Node node)
+ 
+
+instance Feedable Pipe where
+  toPipe p = p
+{- 
+instance Feedable (Pipe) where
+  toPipe  = id
+-}
 -- we need a better name for this, PipeE. Maybe Pipe must be hided and PipeE can be public
 type PipeE = Either String Pipe 
-type Transformer = Pipe->PipeE
+
 
 data PipeCmd = Generate [(Exp, String)] Pipe 
                | GroupBy [Exp] Pipe 
@@ -119,20 +133,23 @@ elem x s = opJoin Or expressions
         
 
 
-select::[(Exp, String)]->Transformer
-select xs p = case gen_type of 
+select::Feedable a =>[(Exp, String)]->a->PipeE
+select xs prev = case gen_type of 
         Left s -> Left s
         Right t ->  Right (t, Generate xs p)
         where
+            p = toPipe prev
             gen_type::Either String [NamedT]
             gen_type =  sequence $ map renameType xs
             renameType = \(exp, name) -> rename name $ typeOf exp p
 
-groupBy::[Exp]->Transformer
-groupBy xs p = case gen_type of
-        Left s -> Left s
-        Right t -> Right (t, GroupBy xs p)
+groupBy::Feedable a => [Exp]-> a -> PipeE
+groupBy xs prev = 
+        case gen_type of
+          Left s -> Left s
+          Right t -> Right (t, GroupBy xs p)
         where
+            p = toPipe prev 
             gen_type::Either String [NamedT]
             gen_type =  myConcat groupType  groupValueType
  
@@ -166,14 +183,15 @@ typeOfCondition (Comp operator exp1 exp2) pipe = do
 
 typeOfCondition (Or exp1 exp2) pipe = Right [(Nothing, Bool)]
 
-filter::Condition->Transformer
-filter cond p@(t, _) = do
+filter::Feedable a =>Condition->a->PipeE
+filter cond prev = do
+                  let p@(t, _) = toPipe prev
                   _ <- typeOfCondition cond p
                   Right (t, Filter cond p)
 
 
-distinct::Transformer
-distinct p@(t, _ ) = Right (t, (Distinct p))
+distinct::Feedable a => a -> PipeE
+distinct prev = let p@(t, _ ) = toPipe prev in Right (t, (Distinct p))
 
 load::String->Schema->PipeE
 load s t = Right (t, Load s)
@@ -183,17 +201,27 @@ input (Left s) = Left s
 input (Right  node@(InputFile schema _ )) = Right (schema, Node node)
 input (Right node@(FileGenerator schema _ _ _ )) = Right (schema, Node node)
 
-union::[PipeE]->PipeE
+{-
+union::Feedable a => [Either String a] -> PipeE
+union [] = Left "empty union"
+union (x:[]) = Right (toPipe x)
+union xs = Right (schema, Union p)
+      where
+        schema = schemaOfPipe (head p)
+        p  sequence $ map toPipe xs
+-}
+union::Feedable a => [Either String a]->PipeE
 union [] = Left "empty Union"
-union ((Right x):[]) = Right x
+union ((Right x):[]) = Right (toPipe x)
 union ((Left s):[]) = Left s
 union xs = -- TODO check scheme equality
       do 
           p <- sequence xs
-          let schema = schemaOfPipe (head p)
-          return (schema, Union p)
-           
-(>>>)::Transformer->Transformer->Transformer
+          let p' = map toPipe p
+          let schema = schemaOfPipe (head p')
+          return (schema, Union p')
+       
+--(>>>)::Transformer->Transformer->Transformer
 x >>> y = \p -> (Right p) >>= x >>= y
     
 {- 
@@ -203,7 +231,7 @@ COUNT(relevant_shows.user_id) as showcount;
 -}
 
 
-freq::[Selector]->Transformer
+freq::Feedable a => [Selector]->a -> PipeE
 freq col = groupBy (map Selector col) >>> select [(c "group", "group"), (Count  (Pos 1), "count") ]
 
 
