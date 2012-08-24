@@ -2,6 +2,8 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 module Language where
 import Data.Maybe
+import Graph
+import Schema
 import Control.Monad.Instances
 import Prelude hiding (filter, elem)
 
@@ -14,19 +16,28 @@ data ComparisonOperator = Eq | Neq | Lt | Gt | LtE | GtE | Matches deriving (Sho
 
 data Condition = Comp ComparisonOperator Exp Exp | And Condition Condition | Or Condition Condition deriving (Show, Eq)
 
-
-
-data Typ = I | S | L | Bool | T Schema | B Schema deriving (Show, Eq)
-type Name = Maybe String
-type NamedT = (Name, Typ)
-type Schema = [NamedT]
-
-type Transformer = Pipe->Either String Pipe
-
-data PipeCmd = Generate [(Exp, String)] Pipe | GroupBy [Exp] Pipe | Filter Condition Pipe | Distinct Pipe | Load String deriving (Show)
-
 type Pipe = (Schema,PipeCmd)
 
+-- we need a better name for this, PipeE. Maybe Pipe must be hided and PipeE can be public
+type PipeE = Either String Pipe 
+type Transformer = Pipe->PipeE
+
+data PipeCmd = Generate [(Exp, String)] Pipe 
+               | GroupBy [Exp] Pipe 
+               | Filter Condition Pipe 
+               | Distinct Pipe 
+               | Node Node
+               | Load String deriving (Show)
+
+getDependencies::PipeCmd->[Node]
+getDependencies (Node node) = [node]
+getDependencies (Generate _ p) = getPipeDependencies p
+getDependencies (GroupBy _ p) = getPipeDependencies p
+getDependencies (Filter _ p) = getPipeDependencies p
+getDependencies (Distinct p) = getPipeDependencies p
+getDependencies (Load _ ) = []
+
+getPipeDependencies (_, p) = getDependencies p
 
 instance Num Exp where
   (+) = undefined
@@ -162,8 +173,13 @@ filter cond p@(t, _) = do
 distinct::Transformer
 distinct p@(t, _ ) = Right (t, (Distinct p))
 
-load::String->Schema->Either String Pipe
+load::String->Schema->PipeE
 load s t = Right (t, Load s)
+
+input::Either String Node->PipeE
+input (Left s) = Left s
+input (Right  node@(InputFile schema _ )) = Right (schema, Node node)
+input (Right node@(FileGenerator schema _ _ _ )) = Right (schema, Node node)
 
 (>>>)::Transformer->Transformer->Transformer
 x >>> y = \p -> (Right p) >>= x >>= y

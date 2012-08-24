@@ -3,7 +3,9 @@ import Data.Time.LocalTime
 import Data.Maybe
 import System.Log.Logger
 import System.Log.Handler.Syslog
-import Language (Schema)
+import Schema
+
+--import Language (Schema)
 -- import Prelude hiding (sequence)
 -- import Control.Monad.Parallel
 {-# LANGUAGE NoMonomorphismRestriction #-}
@@ -38,6 +40,7 @@ data Node =
 instance Show Node where
     show (InputFile schema file) = "input::" ++ (show file) ++ " AS " ++ show schema
     show (FileGenerator schema inputs file _) = "gen:: " ++ show inputs ++ "schema: " ++ show schema ++ show file
+
 
 
 -- later node can inherit schema

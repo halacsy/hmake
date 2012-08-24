@@ -3,7 +3,8 @@ where
 import Prelude hiding (filter)
 import Language
 import Data.List hiding (filter, group, groupBy)
-
+import Schema
+import Graph
 join delim l = concat (intersperse delim l)
 
 class Pprint a where
@@ -94,6 +95,7 @@ pp (_, (GroupBy exps pipe)) = pp_pipe (\i -> " GROUP " ++ i  ++ " BY " ++ (exps2
 pp (_, (Generate exps pipe)) = pp_pipe (\i -> " FOREACH " ++ i  ++ " GENERATE " ++ (forechExps2Str  exps)) pipe
 pp (_, (Filter cond pipe)) = pp_pipe (\i -> " FILTER " ++ i  ++ " BY " ++ (pprint cond)) pipe
 pp (_, (Distinct pipe)) = pp_pipe (\i -> " DISTINCT " ++ i) pipe
+pp (_, (Node (InputFile typ (PigFile file) ))) = pp (typ, (Load file))
 
 -- pp_pipe::Pipe->(Ident, String)
 pp_pipe f pipe = (ident, prev_text ++ "\n" ++ this_text)

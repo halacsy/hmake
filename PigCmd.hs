@@ -91,6 +91,13 @@ pig trans inputNodes o =
             return (FileGenerator outputSchema inputNodes' (PigFile o) execution)
      
 
+pig_node::Either String Pipe->String->Either String Node
+pig_node (Left s) _ = Left s
+pig_node (Right pipe) o = -- we need to find the dependencies
+
+        let dependencies =  getPipeDependencies pipe in
+        Right $ FileGenerator (schemaOfPipe pipe) dependencies (PigFile o) (pig_cmd pipe o)
+
 {-main = do
     print $ pig (pig_command) [input] "hallo"
 -}
