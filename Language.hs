@@ -3,7 +3,7 @@
 module Language where
 import Data.Maybe
 import Control.Monad.Instances
-import Prelude hiding (filter)
+import Prelude hiding (filter, elem)
 
 data Exp = IA Int | SA String | Sub Exp Exp | Selector Selector | Sum Selector | Count Selector deriving (Show, Eq)
 
@@ -26,6 +26,13 @@ type Transformer = Pipe->Either String Pipe
 data PipeCmd = Generate [Exp] Pipe | GroupBy [Exp] Pipe | Filter Condition Pipe | Load String deriving (Show)
 
 type Pipe = (Schema,PipeCmd)
+
+instance Num Exp where
+  (+) = undefined
+  (*) = undefined
+  abs = undefined
+  signum = undefined
+  fromInteger i = IA  (fromInteger i) 
 
 schemaOfPipe::Pipe->Schema
 schemaOfPipe (s, _) = s
@@ -80,6 +87,17 @@ p4 = Selector (Pos 4)
 c::String->Exp
 c name = Selector (Name name)
 
+eq::Exp->Exp->Condition
+eq = Comp Eq
+
+elem :: Exp -> [Exp] -> Condition
+elem x s = opJoin Or expressions 
+    where
+        expressions = map (eq x) s
+        opJoin o (x:[]) = x
+        opJoin o (x:xs) = o x $ opJoin o xs
+        
+
 generate::[Exp]->Transformer
 generate xs p = case gen_type of 
         Left s -> Left s
@@ -124,6 +142,8 @@ typeOfCondition (Comp operator exp1 exp2) pipe = do
             else 
               fail $ "can't compare " ++ (show type1) ++ " to " ++ (show type2)
 
+typeOfCondition (Or exp1 exp2) pipe = Right [(Nothing, Bool)]
+
 filter::Condition->Transformer
 filter cond p@(t, _) = do
                   _ <- typeOfCondition cond p
@@ -131,11 +151,11 @@ filter cond p@(t, _) = do
 
 load::String->Schema->Either String Pipe
 load s t = Right (t, Load s)
-{-}
+
 a::Either String Pipe
 a =  load "vacak" [(Just "user_id", I), (Just "prezi_id", S), (Just "freq", I)] 
       >>= generate [Selector (Pos 1), Selector (Name "freq")] 
-      >>= filter (Comp Eq (Selector (Pos 1)) (Selector (Pos 2)))
+      >>= filter (elem p1 [1, 2, 5])
       >>= groupBy [Selector (Pos 1)] 
       >>= generate [Count (Pos 1)]
 
@@ -144,4 +164,3 @@ main = do
     case a of
         Left s -> print s
         Right p -> print p
--}
