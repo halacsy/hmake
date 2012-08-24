@@ -90,9 +90,7 @@ pig trans inputNodes o =
             let execution = pig_cmd pipe o 
             return (FileGenerator outputSchema inputNodes' (PigFile o) execution)
      
-input = (InputFile ([(Just "user_id", I), (Just "linda", S), (Just "freq", I)] ) (PigFile "hello"))
-pig_command::Transformer
-pig_command = generate [(Selector (Pos 3))]
+
 {-main = do
     print $ pig (pig_command) [input] "hallo"
 -}

@@ -78,11 +78,13 @@ exps2str _ (x:[]) = (pprint x)
 exps2str True xs = "(" ++ join "," (map pprint xs) ++ ")"
 exps2str False xs = join "," (map pprint xs) 
 
+forechExps2Str xs = join "," (map (\(exp, name) -> pprint exp ++ " as " ++ name) xs)
+
 -- TODO: lehet ket load is
 pp::Pipe->(Ident, String)
 pp (typ, (Load name )) = ("A", "A = LOAD '" ++ name ++ "' USING PigStorage(' ') AS (" ++ (schema2str typ) ++ ");")
 pp (_, (GroupBy exps pipe)) = pp_pipe (\i -> " GROUP " ++ i  ++ " BY " ++ (exps2str True exps)) pipe
-pp (_, (Generate exps pipe)) = pp_pipe (\i -> " FOREACH " ++ i  ++ " GENERATE " ++ (exps2str False exps)) pipe
+pp (_, (Generate exps pipe)) = pp_pipe (\i -> " FOREACH " ++ i  ++ " GENERATE " ++ (forechExps2Str  exps)) pipe
 pp (_, (Filter cond pipe)) = pp_pipe (\i -> " FILTER " ++ i  ++ " BY " ++ (pprint cond)) pipe
 pp (_, (Distinct pipe)) = pp_pipe (\i -> " DISTINCT " ++ i) pipe
 

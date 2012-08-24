@@ -23,7 +23,7 @@ type Schema = [NamedT]
 
 type Transformer = Pipe->Either String Pipe
 
-data PipeCmd = Generate [Exp] Pipe | GroupBy [Exp] Pipe | Filter Condition Pipe | Distinct Pipe | Load String deriving (Show)
+data PipeCmd = Generate [(Exp, String)] Pipe | GroupBy [Exp] Pipe | Filter Condition Pipe | Distinct Pipe | Load String deriving (Show)
 
 type Pipe = (Schema,PipeCmd)
 
@@ -78,6 +78,12 @@ typeOf (Selector (Name n)) (t, _) = case lookup (Just n) t of
                                         Just v -> return (Just n, v)
                                         Nothing -> fail $ "don't find: " ++ n
 
+
+rename::String->Either String NamedT->Either String NamedT
+rename _ (Left s) = Left s
+rename newName (Right (_, typ)) = Right (Just newName, typ)
+
+
 p0 = Selector (Pos 0)
 p1 = Selector (Pos 1)
 p2 = Selector (Pos 2)
@@ -98,13 +104,15 @@ elem x s = opJoin Or expressions
         opJoin o (x:xs) = o x $ opJoin o xs
         
 
-generate::[Exp]->Transformer
-generate xs p = case gen_type of 
+
+select::[(Exp, String)]->Transformer
+select xs p = case gen_type of 
         Left s -> Left s
         Right t ->  Right (t, Generate xs p)
         where
             gen_type::Either String [NamedT]
-            gen_type =  sequence $ map (\t -> typeOf t p) xs
+            gen_type =  sequence $ map renameType xs
+            renameType = \(exp, name) -> rename name $ typeOf exp p
 
 groupBy::[Exp]->Transformer
 groupBy xs p = case gen_type of
@@ -149,7 +157,8 @@ filter cond p@(t, _) = do
                   _ <- typeOfCondition cond p
                   Right (t, Filter cond p)
 
-distinct::Pipe->Either String Pipe
+
+distinct::Transformer
 distinct p@(t, _ ) = Right (t, (Distinct p))
 
 load::String->Schema->Either String Pipe
