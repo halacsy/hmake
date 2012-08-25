@@ -1,11 +1,60 @@
-module Util (days_of_month)
+module Util 
 where
 import Data.Time.Calendar
 
---days_of_month y m = [1 .. gregorianMonthLength (fromIntegral y) m]
-days_of_month y m = [1, 2]
-{- 
-main = do 
-	print $ days_of_month 2012 2
+newtype PDay =  PDay Integer deriving (Eq, Ord)
+newtype PMonth = PMonth Int deriving (Eq, Ord)
 
--}
+instance Show PDay where
+    show (PDay i) = show i 
+
+instance Show PMonth where
+    show (PMonth i) = show i
+
+instance Num PDay where
+  (+) (PDay i) (PDay j) = PDay $ i + j -- could be functor?
+  (*) = undefined
+  (-) = undefined
+  negate = undefined
+  abs = undefined
+  signum  = undefined
+  fromInteger  = PDay
+
+dayOfBirth = fromGregorian 2009 4 5
+(y0, m0, d0) = toGregorian dayOfBirth 
+
+ --days_of_month y m = [1 .. gregorianMonthLength (fromIntegral y) m]
+daysOfMonth::PMonth -> [PDay]
+daysOfMonth pm =  map (pDayFromGregorian y m) [1 .. gregorianMonthLength y m]
+    where
+        (y, m) = gregorianFromPMonth pm
+
+
+
+pDayFromGregorian::Integer->Int->Int->PDay
+pDayFromGregorian y m d = PDay $ diffDays (fromGregorian y m d)  dayOfBirth
+
+pMonthFromGregorian::Integer-> Int->PMonth
+pMonthFromGregorian y1 m1  = PMonth $ (fromIntegral (y1 - y0)) * 12 + (m1 - m0)
+
+gregorianFromPDay::PDay->(Integer, Int, Int)
+gregorianFromPDay (PDay d) = toGregorian $ addDays d dayOfBirth
+
+
+gregorianFromPMonth::PMonth->(Integer, Int)
+gregorianFromPMonth (PMonth m) = (y0 + (fromIntegral (m `div` 12)), m0+ m `mod` 12)
+
+{- this is for quickcheck -}
+prop_pMonthIsomorph::Int->Bool
+prop_pMonthIsomorph m =  pid m' == m'
+    where pid m =  let (y, m) = gregorianFromPMonth m' in pMonthFromGregorian y m
+          m' = PMonth m
+
+prop_pDayIsomorph::Integer -> Bool
+prop_pDayIsomorph d = pid d' == d'
+    where pid d =  let (y, m, d) = gregorianFromPDay d' in pDayFromGregorian y m d
+          d' = PDay d
+main = do 
+    print $ map gregorianFromPDay $ daysOfMonth $ pMonthFromGregorian 2012 8
+
+
