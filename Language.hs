@@ -42,7 +42,11 @@ data PipeCmd = Generate [(Exp, String)] Pipe
                | Distinct Pipe 
                | Union [Pipe]
                | Node Node
+               | Merge Pipe Pipe 
                | Load String deriving (Show)
+
+-- this is not a final design, and doesn't represent what we want to achive
+data SortOut = SortOut Pipe [(Condition, File)]
 
 getDependencies::PipeCmd->[Node]
 getDependencies (Node node) = [node]
@@ -234,6 +238,11 @@ COUNT(relevant_shows.user_id) as showcount;
 freq::Feedable a => [Selector]->a -> PipeE
 freq col = groupBy (map Selector col) >>> select [(c "group", "group"), (Count  (Pos 1), "count") ]
 
+sortOut::Feedable a => Selector->[(Exp, File)] -> a -> Either String SortOut
+sortOut sel exps pipe = Right $ SortOut (toPipe pipe) conds
+  where
+    -- TODO: no verification here!
+    conds = map (\(e, f) -> (eq (Selector sel) e, f)) exps
 
 {-
 

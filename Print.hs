@@ -104,6 +104,17 @@ pp (typ, (Union pipes)) =
         where 
             toNode (_, (Node n)) = n
             toNode _ = undefined
+printSortOut::Pipe->[(Condition, File)]->String
+printSortOut pipe slots = pipeStr ++ "\n" ++ split  ++ (concat stores)
+    where 
+        (ident, pipeStr) = pp pipe
+        rankedSlots::[(Int, (Condition, File))]
+        rankedSlots = zip [5..] slots
+        slotName r = "A" ++ (show r)
+        conds = map (\(r, (c, _)) -> (slotName r) ++ " IF " ++ pprint c) rankedSlots
+        -- SPLIT A INTO A1 IF (date == '2012-05-05'), A2 IF (date == '2012-05-06');
+        split =  "SPLIT " ++ ident ++ " INTO " ++ (join ", " conds) ++ ";\n"
+        stores = map (\(r, (_, (PigFile file))) -> "STORE " ++ (slotName r) ++ " INTO '" ++ file ++ "' USING PigStorage(' ') ;\n") rankedSlots
 
 -- this can be more haskell like. Creates from
 -- /Users/hp/log-1, /Users/hp/log-2 -> /Users/hp/log-{1,2}

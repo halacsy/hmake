@@ -10,8 +10,8 @@ import Prelude hiding (elem, filter)
 
 kpiCodesWithUserActivity = [0,1, 2,3,4,5,6,10,11,13, 14, 17,19, 20, 21, 30]
 
-type DaylyFile = Int->Int->Int->Either String Node
-type MonthlyFile = Int -> Int -> Either String Node
+type DaylyFile = Integer->Int->Int->Either String Node
+type MonthlyFile = Integer -> Int -> Either String Node
 
 kpi_schema = [(Just "date", S), 
               (Just "time", S), 
@@ -23,8 +23,8 @@ kpi_schema = [(Just "date", S),
               (Just "p3", S)] 
 
 --	kpi_log y m d = Right $ InputFile kpi_schema (PigFile  $ printf "/scribe/kpi/kpi-%04d-%02d-%02d_00000" y m d)
-kpi_log::Int->Int->Int->Either String Node
-kpi_log y m d = Right $ InputFile kpi_schema (PigFile  "/Users/hp/Documents/HasMake/vacak.log")
+kpi_log_raw::Integer->Int->Int->Either String Node
+kpi_log_raw y m d = Right $ InputFile kpi_schema (PigFile  $"/Users/hp/Documents/HasMake/vacak" ++ show d ++ ".log")
 
 
 
@@ -38,14 +38,24 @@ out_base name = base ++ name
 
 
 daily_uniq_users ::DaylyFile
-daily_uniq_users  y m d = pig_node (  kpi_log y m d
+daily_uniq_users  y m d = pig_node (  kpi_log_raw y m d
                                       >>= filter ( c "type" `elem` kpiCodesWithUserActivity )  
                                       >>= select [(c "p1", "user_id")] 
                                       >>= distinct )  
                               (printf (out_base "daily_uniq_users-%04d-%02d-%02d") y m d )
 
-                       
+--sortOut::Feedable a => Selector->[(Exp, File)] -> a -> Either String SortOut
 
+kpi_sorter y m d = sortOut2 $  (kpi_log_raw y m d >>= sortOut  by slots ) 
+  where
+    by = (Name "date")
+    -- from the give day we go back 20 days
+    pdayEnd = pDayFromGregorian y m d
+    range = [(pdayEnd - 20) .. pdayEnd]
+    slots = map (\pday -> let str = showPDayAsGregorian pday in 
+                     (SA str, PigFile $ "kpi-" ++ str ++ "__" ++ (show pday))) range
+                     
+{- 
 monthly_uniq_users::MonthlyFile
 monthly_uniq_users y m = pig_node ( union [daily_uniq_users y m d | d <- days_of_month y m]  
                                       >>= distinct)
@@ -60,7 +70,9 @@ daily_user_prezi_edits y m d = pig_node ( edit_logs y m d
                                           >>= freq [(Name "user_id"), (Name "prezi_id")] ) 
                             
                               (printf (out_base "daily_user_prezi_edit_freqs-%04d-%02d-%02d") y m d )
-{-
+
+acc_user_prezi_edits y m d =                              
+
 daily_user_prezi_edits2 y m d = pig distinct [daily_user_prezi_edits y m d] (printf (out_base "cucc"))
 
 daily_user_save_counts::DaylyFile
@@ -69,7 +81,7 @@ daily_user_save_counts y m d = pig (sum_by 2 [0])
                                (printf (out_base "daily_user_save_counts" ) y m d )
 -}
 main = do
-  doIt $ daily_user_prezi_edits 2012 05 03
+  doIt $ kpi_sorter 2012 05 02
 
 
     
