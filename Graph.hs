@@ -102,9 +102,9 @@ execute' run deps cmd =
     do
         c <- sequence $ map (execute2 run) deps 
         cmdS <- cmd False
-        myLog ("starting cmd" ++ cmdS)
+      --  myLog ("starting cmd" ++ cmdS)
         my <- cmd run
-        myLog ("end of cmd" ++ my)
+      --  myLog ("end of cmd" ++ my)
 
         return ( (flatten c) ++ [ my ])
         where

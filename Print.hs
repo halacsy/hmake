@@ -96,7 +96,7 @@ pp (_, (Generate exps pipe)) = pp_pipe (\i -> " FOREACH " ++ i  ++ " GENERATE " 
 pp (_, (Filter cond pipe)) = pp_pipe (\i -> " FILTER " ++ i  ++ " BY " ++ (pprint cond)) pipe
 pp (_, (Distinct pipe)) = pp_pipe (\i -> " DISTINCT " ++ i) pipe
 pp (_, (Node (InputFile typ (PigFile file) ))) = pp (typ, (Load file))
-
+pp (_, (Node (FileGenerator typ _ (PigFile file) _  ))) = pp (typ, (Load file))
 pp (typ, (Union pipes)) = 
     let inputNodes = map toNode pipes in
     let globbedInput = toGlob $ map nameOfFile $ getOutputFiles inputNodes in
