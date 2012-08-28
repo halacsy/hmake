@@ -84,20 +84,6 @@ pig_node (Right pipe) o = -- we need to find the dependencies
         let dependencies =  getPipeDependencies pipe in
         Right $ FileGenerator (schemaOfPipe pipe) dependencies (PigFile o) (pig_cmd pipe o)
 
---sortExecution::Pipe->->Execution
-sortExecution pipe slots really = do
-
-         return $ printSortOut pipe slots
-
--- ugly ugly, needs refactoring. i don't still know where sortOut goes
-sortOut2::Either String SortOut-> Either String Node
-sortOut2 (Left s) = Left s
-sortOut2 (Right (SortOut pipe slots)) = Right $ Sorter schema input outputs execution
-    where 
-        schema = schemaOfPipe pipe
-        input = getPipeDependencies pipe
-        outputs = map snd slots
-        execution = sortExecution pipe slots
 
 {-main = do
     print $ pig (pig_command) [input] "hallo"

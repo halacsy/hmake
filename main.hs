@@ -43,14 +43,12 @@ kpi_log_sorted pday = pig_node (union [kpi_log_raw d | d <- [pday .. pday + 5] ]
                                 >>= filter ( c "date" `eq`  SA (showPDayAsGregorian pday) ))
                                 (base ++ "/kpi-sorted-" ++ (show pday))
 
-daily_uniq_users ::PDay -> Either String Node
 daily_uniq_users  pday = pig_node (  kpi_log_sorted pday
                                       >>= filter ( c "type" `elem` kpiCodesWithUserActivity )  
                                       >>= select [(c "p1", "user_id")] 
                                       >>= distinct )  
                               (base ++ "daily_uniq_users-" ++ (show pday))
 
-facebook_active_users::PDay -> Either String Node
 facebook_active_users pday =  pig_node ( union [daily_uniq_users d | d <- [pday - 30 .. pday]]  
                                       >>= distinct)
                               (base ++ "facebook_active_users-" ++ (show pday) )
