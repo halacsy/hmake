@@ -41,7 +41,7 @@ out_base name = base ++ name
 
 kpi_log_sorted pday = pig_node (union [kpi_log_raw d | d <- [pday .. pday + 5] ] 
                                 >>= filter ( c "date" `eq`  SA (showPDayAsGregorian pday) ))
-                                (base ++ "/kpi-sorted-" ++ (show pday))
+                                (base ++ "/kpi-sorted-" ++ (show pday)) >>= optionalInput
 
 daily_uniq_users  pday = pig_node (  kpi_log_sorted pday
                                       >>= filter ( c "type" `elem` kpiCodesWithUserActivity )  

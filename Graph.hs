@@ -4,7 +4,9 @@ import Data.Maybe
 import System.Log.Logger
 import System.Log.Handler.Syslog
 import Schema
-
+import System.Posix.Types(EpochTime)
+import System.Posix.Files(modificationTime, getFileStatus)
+import System.IO.Error 
 --import Language (Schema)
 -- import Prelude hiding (sequence)
 -- import Control.Monad.Parallel
@@ -35,8 +37,13 @@ nameOfFile (PigFile name) = name
 
 data Node = 
 	InputFile Schema File |
-	FileGenerator Schema [Node] File Execution 
+	FileGenerator Schema Dependency File Execution 
 
+data Dependency = All [Node] | Any [Node] deriving (Show)
+
+source::Dependency->[Node]
+source (All nodes) = nodes
+source (Any nodes) = nodes
 
 instance Show Node where
     show (InputFile schema file) = "input::" ++ (show file) ++ " AS " ++ show schema
@@ -53,19 +60,40 @@ schemaOfNode (FileGenerator s _ _ _) = s
 -- this is other viewpoint -> a GenNode gets input, you name the output and gives Node
 -- which can connected
 --type GenNode = [Node]->File->Node
+-- TODO why is this Maybe
 
-output::Node->Maybe File
-output (InputFile _ f) = Just f
-output (FileGenerator _ _ f _)  = Just f
+outputOfNode::Node->Maybe File
+outputOfNode (InputFile _ f) = Just f
+outputOfNode (FileGenerator _ _ f _)  = Just f
 
 
 getOutputFiles::[Node]->[File]
-getOutputFiles nodes = map fromJust $ filter isJust $ map output nodes
+getOutputFiles nodes = map fromJust $ filter isJust $ map outputOfNode nodes
 
+haveToGenerateFromTimes::Maybe EpochTime->[Maybe EpochTime]->Bool
+haveToGenerateFromTimes Nothing _ = True
+haveToGenerateFromTimes _ [] = False
+haveToGenerateFromTimes t (Nothing:xs) = haveToGenerateFromTimes t xs
+haveToGenerateFromTimes (Just t1) (Just t2:xs) = if t1 < t2 then True else haveToGenerateFromTimes (Just t1) xs
 
-have_to_generate::Node->[Node]->IO Bool
+getActualFile (UnixFile f) = f
+getActualFile (PigFile f) = "/mnt/hdfs" ++ f
+
+modTime::File->IO (Maybe EpochTime)
+modTime f = do
+
+    stat <- try $ getFileStatus $ getActualFile f
+    case stat of
+        Left ex -> return Nothing
+        Right stat ->  return $ Just $ modificationTime stat
+
+have_to_generate::File->Dependency->IO Bool
 --have_to_generate "user-2012-5-1" _ = return Fa
-have_to_generate _ _ = return True
+have_to_generate f (All nodes) = do
+        targetTime <- modTime f
+        sourcesTime <- sequence . map modTime $ getOutputFiles nodes
+        return $ haveToGenerateFromTimes targetTime sourcesTime
+    
 
 
 -- selects subgraph which should be executed
@@ -78,14 +106,14 @@ reduce i@(InputFile _ _) = return i
 reduce node@(FileGenerator schema deps output cmd) = 
 		do
 			-- this must be executed iif output is too old
-            too_old <- have_to_generate node deps
+            too_old <- have_to_generate output deps
             --  any of it's child must be genereted
-            childs <-  sequence $ map reduce deps
-            let child_to_gen = filter generated childs
-            if (null child_to_gen) && (not too_old) then
+            children <-  sequence $ map reduce $ source deps
+            let children_to_gen = filter generated children
+            if (null children_to_gen) && (not too_old) then
                     return (InputFile schema output)
                  else 
-                    return (FileGenerator schema childs output cmd)
+                    return (FileGenerator schema (All children) output cmd)
                  where
                  -- maybe there is a shorter version of this
                  generated (InputFile _ _) = False
@@ -97,7 +125,7 @@ execute2 _ (InputFile _ _)  = return []
 execute2 run (FileGenerator _ deps _ cmd)   = execute' run deps cmd
 execute' run deps cmd =
     do
-        c <- sequence $ map (execute2 run) deps 
+        c <- sequence $ map (execute2 run) (source deps) 
         cmdS <- cmd False
       --  myLog ("starting cmd" ++ cmdS)
         my <- cmd run
@@ -111,7 +139,7 @@ execute' run deps cmd =
 execution::Node->IO [Execution]
 execution (InputFile _ _) = return []
 execution (FileGenerator _ deps o cmd)  = do
-        c <- sequence $ map execution deps
+        c <- sequence $ map execution (source deps)
         return ( (concat c) ++ [ cmd ])
       
 

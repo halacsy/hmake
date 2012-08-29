@@ -82,7 +82,12 @@ pig_node (Left s) _ = Left s
 pig_node (Right pipe) o = -- we need to find the dependencies
 
         let dependencies =  getPipeDependencies pipe in
-        Right $ FileGenerator (schemaOfPipe pipe) dependencies (PigFile o) (pig_cmd pipe o)
+        Right $ FileGenerator (schemaOfPipe pipe) (All dependencies) (PigFile o) (pig_cmd pipe o)
+
+optionalInput::Node -> Either String Node
+optionalInput x@(InputFile _ _) = Right x
+optionalInput x@(FileGenerator _ (All dependencies) _ _ ) = Right x
+optionalInput (FileGenerator p (Any dependencies) f c ) = Right $ FileGenerator p (All dependencies) f c
 
 
 {-main = do
