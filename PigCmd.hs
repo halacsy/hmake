@@ -89,7 +89,11 @@ optionalInput x@(InputFile _ _) = Right x
 optionalInput x@(FileGenerator _ (Any dependencies) _ _ ) = Right x
 optionalInput (FileGenerator p (All dependencies) f c ) = Right $ FileGenerator p (Any dependencies) f c
 
-
+doAllOf::[Either String Node] -> Either String Node
+doAllOf nodes = do
+    nodes' <- sequence nodes
+    return $ TaskGroup nodes'
+    
 {-main = do
     print $ pig (pig_command) [input] "hallo"
 -}

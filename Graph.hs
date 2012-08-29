@@ -37,7 +37,8 @@ nameOfFile (PigFile name) = name
 
 data Node = 
 	InputFile Schema File |
-	FileGenerator Schema Dependency File Execution 
+	FileGenerator Schema Dependency File Execution |
+    TaskGroup [Node]
 
 data Dependency = All [Node] | Any [Node] deriving (Show)
 
@@ -65,7 +66,7 @@ schemaOfNode (FileGenerator s _ _ _) = s
 outputOfNode::Node->Maybe File
 outputOfNode (InputFile _ f) = Just f
 outputOfNode (FileGenerator _ _ f _)  = Just f
-
+outputOfNode (TaskGroup _) = Nothing
 
 getOutputFiles::[Node]->[File]
 getOutputFiles nodes = map fromJust $ filter isJust $ map outputOfNode nodes
@@ -106,7 +107,9 @@ have_to_generate f dependency = do
 -- or FileGenerator otherwise
 reduce::Node->IO Node
 reduce i@(InputFile _ _) = return i
-
+reduce t@(TaskGroup nodes) =  do
+                                children <- sequence $ map reduce nodes
+                                return $ TaskGroup children
 
 reduce node@(FileGenerator schema deps output cmd) = 
 		do
@@ -127,6 +130,9 @@ reduce node@(FileGenerator schema deps output cmd) =
 
 execute2::Bool->Node->IO [String]
 execute2 _ (InputFile _ _)  = return []
+execute2 run (TaskGroup nodes) = do 
+                                    c <- sequence $ map (execute2 run) nodes
+                                    return $ concat c
 execute2 run (FileGenerator _ deps _ cmd)   = execute' run deps cmd
 execute' run deps cmd =
     do

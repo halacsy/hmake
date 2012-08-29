@@ -79,7 +79,8 @@ daily_user_save_counts y m d = pig (sum_by 2 [0])
 -}
 main = do
  -- print $ kpi_log_sorted 12
- doIt $ facebook_active_users $  pDayFromGregorian 2012 08 18
+ let range = [ pDayFromGregorian 2012 08 1 .. pDayFromGregorian 2012 08 29   ]
+ doIt $ doAllOf  [facebook_active_users d | d<- range]
 
 
     
