@@ -238,11 +238,6 @@ COUNT(relevant_shows.user_id) as showcount;
 freq::Feedable a => [Selector]->a -> PipeE
 freq col = groupBy (map Selector col) >>> select [(c "group", "group"), (Count  (Pos 1), "count") ]
 
-sortOut::Feedable a => Selector->[(Exp, File)] -> a -> Either String SortOut
-sortOut sel exps pipe = Right $ SortOut (toPipe pipe) conds
-  where
-    -- TODO: no verification here!
-    conds = map (\(e, f) -> (eq (Selector sel) e, f)) exps
 
 {-
 
