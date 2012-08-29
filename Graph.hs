@@ -38,7 +38,7 @@ nameOfFile (PigFile name) = name
 data Node = 
 	InputFile Schema File |
 	FileGenerator Schema Dependency File Execution 
-
+    
 data Dependency = All [Node] | Any [Node] deriving (Show)
 
 source::Dependency->[Node]
@@ -70,11 +70,6 @@ outputOfNode (FileGenerator _ _ f _)  = Just f
 getOutputFiles::[Node]->[File]
 getOutputFiles nodes = map fromJust $ filter isJust $ map outputOfNode nodes
 
-haveToGenerateFromTimes::Maybe EpochTime->[Maybe EpochTime]->Bool
-haveToGenerateFromTimes Nothing _ = True
-haveToGenerateFromTimes _ [] = False
-haveToGenerateFromTimes t (Nothing:xs) = haveToGenerateFromTimes t xs
-haveToGenerateFromTimes (Just t1) (Just t2:xs) = if t1 < t2 then True else haveToGenerateFromTimes (Just t1) xs
 
 getActualFile (UnixFile f) = f
 getActualFile (PigFile f) = "/mnt/hdfs" ++ f
@@ -87,12 +82,22 @@ modTime f = do
         Left ex -> return Nothing
         Right stat ->  return $ Just $ modificationTime stat
 
+haveToGenerateFromTimes::Maybe EpochTime->Bool->[Maybe EpochTime]->IO Bool
+haveToGenerateFromTimes Nothing _ _ =  True
+haveToGenerateFromTimes _ _ [] = False
+haveToGenerateFromTimes t allNeeded (Nothing:xs) = allNeeded || haveToGenerateFromTimes t allNeeded xs
+haveToGenerateFromTimes (Just t1) allNeeded (Just t2:xs) = if t1 < t2 then True else haveToGenerateFromTimes (Just t1) allNeeded xs
+
 have_to_generate::File->Dependency->IO Bool
 --have_to_generate "user-2012-5-1" _ = return Fa
-have_to_generate f (All nodes) = do
+have_to_generate f dependency = do
         targetTime <- modTime f
+        let (nodes, allNeeded) = case dependency of 
+                                    All nodes -> (nodes, True)
+                                    Any nodes -> (nodes, False)
+
         sourcesTime <- sequence . map modTime $ getOutputFiles nodes
-        return $ haveToGenerateFromTimes targetTime sourcesTime
+        return $ haveToGenerateFromTimes targetTime allNeeded sourcesTime 
     
 
 

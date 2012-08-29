@@ -78,7 +78,8 @@ daily_user_save_counts y m d = pig (sum_by 2 [0])
                                (printf (out_base "daily_user_save_counts" ) y m d )
 -}
 main = do
-  doIt $ facebook_active_users $  pDayFromGregorian 2012 08 18
+ -- print $ kpi_log_sorted 12
+ doIt $ facebook_active_users $  pDayFromGregorian 2012 08 18
 
 
     

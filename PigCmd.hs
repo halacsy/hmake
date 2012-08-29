@@ -86,8 +86,8 @@ pig_node (Right pipe) o = -- we need to find the dependencies
 
 optionalInput::Node -> Either String Node
 optionalInput x@(InputFile _ _) = Right x
-optionalInput x@(FileGenerator _ (All dependencies) _ _ ) = Right x
-optionalInput (FileGenerator p (Any dependencies) f c ) = Right $ FileGenerator p (All dependencies) f c
+optionalInput x@(FileGenerator _ (Any dependencies) _ _ ) = Right x
+optionalInput (FileGenerator p (All dependencies) f c ) = Right $ FileGenerator p (Any dependencies) f c
 
 
 {-main = do
