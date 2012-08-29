@@ -38,7 +38,7 @@ nameOfFile (PigFile name) = name
 data Node = 
 	InputFile Schema File |
 	FileGenerator Schema Dependency File Execution 
-    
+
 data Dependency = All [Node] | Any [Node] deriving (Show)
 
 source::Dependency->[Node]
@@ -82,7 +82,7 @@ modTime f = do
         Left ex -> return Nothing
         Right stat ->  return $ Just $ modificationTime stat
 
-haveToGenerateFromTimes::Maybe EpochTime->Bool->[Maybe EpochTime]->IO Bool
+haveToGenerateFromTimes::Maybe EpochTime->Bool->[Maybe EpochTime]->Bool
 haveToGenerateFromTimes Nothing _ _ =  True
 haveToGenerateFromTimes _ _ [] = False
 haveToGenerateFromTimes t allNeeded (Nothing:xs) = allNeeded || haveToGenerateFromTimes t allNeeded xs
