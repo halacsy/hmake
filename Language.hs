@@ -7,7 +7,7 @@ import Schema
 import Control.Monad.Instances
 import Control.Monad
 import Prelude hiding (filter, elem)
-
+import Data.List (deleteBy)
 data Exp = IA Int | SA String | Sub Exp Exp | Selector Selector | Sum Selector | Count Selector  deriving (Show, Eq)
 
 -- TODO rename to Exp
@@ -54,7 +54,7 @@ instance Feedable (Pipe) where
 -- we need a better name for this, PipeE. Maybe Pipe must be hided and PipeE can be public
 type PipeE = Either String Pipe 
 
-data GeneratingExp = Flatten Selector | Exp Exp (Maybe String) deriving (Show)
+data GeneratingExp = Flatten Selector | Exp Exp (Maybe String) | NestedProjection Selector [Selector] deriving (Show)
 data PipeCmd = Generate [GeneratingExp] Pipe 
                | GroupBy [Exp] Pipe 
                | Filter Condition Pipe 
@@ -77,6 +77,7 @@ getDependencies (GroupBy _ p) = getPipeDependencies p
 getDependencies (Filter _ p) = getPipeDependencies p
 getDependencies (Distinct p) = getPipeDependencies p
 getDependencies (Load _ ) = []
+getDependencies (Join _ pipe1 _ pipe2 _) = (getPipeDependencies pipe1) ++ (getPipeDependencies pipe2)
 
 getPipeDependencies (_, p) = getDependencies p
 
@@ -119,13 +120,20 @@ typeOf (Sub exp1 exp2) p = do
      if t1 == t2 then return (Nothing, t1) else fail $ "uncombatible types" ++ (show  exp1) ++ " " ++  (show exp2) 
 
 typeOf (Selector (Pos x) ) (t, _) =  if x > length t - 1 
-                                    then fail $ "out of index " ++ (show x) 
+                                    then fail $ "out of index " ++ (show x) ++ " in " ++ show t
                                    else
                                     return (t !! x)
 
 typeOf (Selector (Name n)) (t, p) = case lookup (Just n) t of  
                                         Just v -> return (Just n, v)
                                         Nothing -> fail $ "don't find: " ++ n ++ " in " ++ (show t) ++ (show p)
+
+typeOf (Selector (ComplexSelector sel1 sel2)) (t, p) = do
+    (_, typ) <- typeOf (Selector sel1) (t, p)
+    case typ of
+         T schema -> typeOf (Selector sel2) (schema, p)
+         B schema -> typeOf (Selector sel2) (schema, p)
+         otherwise ->  fail $ "can't subselect with" ++ show sel1 ++ show sel2 ++ " in " ++ show typ
 
 rename::String->Either String NamedT->Either String NamedT
 rename _ (Left s) = Left s
@@ -166,6 +174,7 @@ select xs prev = do
             typeOfGenExp::GeneratingExp->Either String [NamedT]
             typeOfGenExp (Exp e (Just name)) = sequence [rename name $ typeOf e p]
             typeOfGenExp (Exp e Nothing) = sequence [ typeOf e p]
+            typeOfGenExp (NestedProjection sel1 sels) = mapM (\sel -> typeOf (Selector $ ComplexSelector sel1 sel) p) sels 
             typeOfGenExp (Flatten selector) = case typeOf (Selector selector) p of
                     Left s -> Left s 
                     Right (_, T schema) -> Right schema
@@ -260,8 +269,20 @@ COUNT(relevant_shows.user_id) as showcount;
 -}
 
 
-freq::Feedable a => [Selector]->a -> PipeE
-freq col = groupBy (map Selector col) >>> select [Flatten $ Pos 0, Exp ( Count  (Pos 1)) (Just "count") ]
+freq::(Selectorr s, Feedable a) => [s]->a -> PipeE
+freq col = groupBy (map (toExp . toSelector) col) >>> select [Flatten $ Pos 0, Exp ( Count  (Pos 1)) (Just "count") ]
+
+groupByCol::(Selectorr s, Feedable a) => s -> a -> PipeE
+groupByCol col f = do
+    let pipe@(schema, _) = toPipe f
+    let ex = toExp $ toSelector col
+    (name, typ) <- typeOf ex pipe
+    groupped <- groupBy [ex] pipe
+    let ranked = zip [0..] schema
+    let eqq a b = (fst ( snd a) ) ==  (fst ( snd b ))
+    let newRankedSchema = deleteBy eqq (-1, (name, typ)) ranked
+    let newCols = NestedProjection (Pos 1) $ map (\(r, (n, _))-> Pos r) newRankedSchema
+    select [(Exp (Selector $ Pos 0) name) , newCols] groupped
 
 (<:>)::String->Exp->(Exp, String)
 n <:> e = (e, n)

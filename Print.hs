@@ -33,6 +33,7 @@ instance   Pprint Exp where
     pprint (Selector (Pos i)) = "$" ++ (show i)
     pprint (Selector (Name s)) = s
     pprint (Count e) = "COUNT(" ++ pprint (Selector e) ++ ")"
+    pprint (Selector (ComplexSelector sel1 sel2)) = pprint (Selector sel1) ++ "." ++ pprint (Selector sel2)
     {-
     pprint (CompExpr op exp1 exp2) = "(" ++ pprint exp1 ++ pprint op ++ pprint exp2 ++ ")"
     pprint (ArithExpr op exp1 exp2) = "(" ++ pprint exp1 ++ pprint op ++ pprint exp2 ++ ")"
@@ -90,6 +91,7 @@ forechExps2Str xs = join "," (map printNamedExp xs)
                             | otherwise = s ++ " as " ++ name
         printNamedExp (Exp exp (Just name)) = pprint exp ++ " as " ++ name
         printNamedExp (Exp exp Nothing) = pprint exp 
+        printNamedExp (NestedProjection sel xs) = pprint (Selector sel) ++ ".(" ++ join "," (map (pprint . Selector) xs) ++ ")"
         printNamedExp (Flatten selector) = "FLATTEN(" ++ pprint (Selector selector) ++ ")"
         
 
