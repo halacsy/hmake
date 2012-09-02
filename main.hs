@@ -8,7 +8,11 @@ import Cli
 import Schema
 import Prelude hiding (elem, filter)
 
+kpiCodesWithUserActivity::[Int]
 kpiCodesWithUserActivity = [0,1, 2,3,4,5,6,10,11,13, 14, 17,19, 20, 21, 30]
+
+kpiSave::Int
+kpiSave = 3
 
 type DaylyFile = PDay->Either String Node
 type MonthlyFile = PMonth -> Either String Node
@@ -45,13 +49,26 @@ kpi_log_sorted pday = pig_node (union [kpi_log_raw d | d <- [pday .. pday + 5] ]
 
 daily_uniq_users  pday = pig_node (  kpi_log_sorted pday
                                       >>= filter ( c "type" `elem` kpiCodesWithUserActivity )  
-                                      >>= select [(c "p1", "user_id")] 
+                                      >>= cut [("p1", "user_id")] 
                                       >>= distinct )  
                               (base ++ "daily_uniq_users-" ++ (show pday))
 
 facebook_active_users pday =  pig_node ( union [daily_uniq_users d | d <- [pday - 30 .. pday]]  
                                       >>= distinct)
                               (base ++ "facebook_active_users-" ++ (show pday) )
+
+edit_logs::PDay->Either String Pipe
+edit_logs pday = kpi_log_sorted pday >>= filter (c "type" `eq` kpiSave)
+
+
+daily_user_prezi_edits day = pig_node ( edit_logs day
+                                          >>= cut [("p1", "user_id"), ("p2", "prezi_id")] 
+                                        >>= freq [(Name "user_id"), (Name "prezi_id")]  )  
+                              (base ++ "daily_user_prezi_edits-" ++ show day)
+
+
+-- prezi+edit, osszes edit
+
 {- 
 monthly_uniq_users::MonthlyFile
 monthly_uniq_users y m = pig_node ( union [daily_uniq_users y m d | d <- days_of_month y m]  
@@ -68,7 +85,7 @@ daily_user_prezi_edits y m d = pig_node ( edit_logs y m d
                             
                               (printf (out_base "daily_user_prezi_edit_freqs-%04d-%02d-%02d") y m d )
 
-acc_user_prezi_edits y m d =                              
+                             
 
 daily_user_prezi_edits2 y m d = pig distinct [daily_user_prezi_edits y m d] (printf (out_base "cucc"))
 
@@ -80,7 +97,7 @@ daily_user_save_counts y m d = pig (sum_by 2 [0])
 main = do
  -- print $ kpi_log_sorted 12
  let range = [ pDayFromGregorian 2012 08 1 .. pDayFromGregorian 2012 08 29   ]
- doIt $ doAllOf  [facebook_active_users d | d<- range]
-
+-- doIt $ doAllOf  [facebook_active_users d | d<- range]
+ doIt $ daily_user_prezi_edits 1242
 
     

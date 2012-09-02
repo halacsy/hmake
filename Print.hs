@@ -1,7 +1,7 @@
 module Print 
 where
 import Prelude hiding (filter)
-import Language
+import Language hiding (join)
 import Data.List hiding (filter, group, groupBy)
 import Schema
 import Graph
@@ -79,14 +79,20 @@ exps2str _ (x:[]) = (pprint x)
 exps2str True xs = "(" ++ join "," (map pprint xs) ++ ")"
 exps2str False xs = join "," (map pprint xs) 
 
+forechExps2Str::[GeneratingExp]->String
 forechExps2Str xs = join "," (map printNamedExp xs)
     where       
-        printNamedExp::(Exp, String)->String
-        -- pig doesn't like this:  AAAA =  FOREACH AAA GENERATE group as group,COUNT($1) as count;
-        printNamedExp ((Selector (Name s)), name) 
+        printNamedExp::GeneratingExp->String
+        -- pig doesn't like if we write x as x   
+        -- like hereAAAA =  FOREACH AAA GENERATE group as group,COUNT($1) as count;
+        printNamedExp (Exp (Selector (Name s)) (Just  name) )
                             | s == name = s
                             | otherwise = s ++ " as " ++ name
-        printNamedExp (exp, name) = pprint exp ++ " as " ++ name
+        printNamedExp (Exp exp (Just name)) = pprint exp ++ " as " ++ name
+        printNamedExp (Exp exp Nothing) = pprint exp 
+        printNamedExp (Flatten selector) = "FLATTEN(" ++ pprint (Selector selector) ++ ")"
+        
+
 
 -- TODO: lehet ket load is
 pp::Pipe->(Ident, String)

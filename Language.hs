@@ -5,12 +5,31 @@ import Data.Maybe
 import Graph
 import Schema
 import Control.Monad.Instances
+import Control.Monad
 import Prelude hiding (filter, elem)
 
-data Exp = IA Int | SA String | Sub Exp Exp | Selector Selector | Sum Selector | Count Selector | Flatten Selector deriving (Show, Eq)
+data Exp = IA Int | SA String | Sub Exp Exp | Selector Selector | Sum Selector | Count Selector  deriving (Show, Eq)
+
+-- TODO rename to Exp
+class Expp a where
+  toExp::a -> Exp
 
 
-data Selector = Pos Int | Name String deriving (Show, Eq)
+
+data Selector = Pos Int | Name String | ComplexSelector Selector Selector deriving (Show, Eq)
+
+instance Expp Selector where
+  toExp s = (Selector s)
+
+instance Expp Exp where
+  toExp = id
+
+class Selectorr a where
+  toSelector::a->Selector
+
+instance Selectorr String where
+  toSelector ('$':col) = undefined
+  toSelector name = Name name 
 
 data ComparisonOperator = Eq | Neq | Lt | Gt | LtE | GtE | Matches deriving (Show, Eq)
 
@@ -35,15 +54,17 @@ instance Feedable (Pipe) where
 -- we need a better name for this, PipeE. Maybe Pipe must be hided and PipeE can be public
 type PipeE = Either String Pipe 
 
-
-data PipeCmd = Generate [(Exp, String)] Pipe 
+data GeneratingExp = Flatten Selector | Exp Exp (Maybe String) deriving (Show)
+data PipeCmd = Generate [GeneratingExp] Pipe 
                | GroupBy [Exp] Pipe 
                | Filter Condition Pipe 
                | Distinct Pipe 
                | Union [Pipe]
                | Node Node
-               | Merge Pipe Pipe 
+               | Join JoinType Pipe Selector Pipe Selector
                | Load String deriving (Show)
+
+data JoinType = Inner | LeftOuter | RightOuter | FullOuter deriving (Show, Eq)
 
 -- this is not a final design, and doesn't represent what we want to achive
 data SortOut = SortOut Pipe [(Condition, File)]
@@ -59,12 +80,8 @@ getDependencies (Load _ ) = []
 
 getPipeDependencies (_, p) = getDependencies p
 
-instance Num Exp where
-  (+) = undefined
-  (*) = undefined
-  abs = undefined
-  signum = undefined
-  fromInteger i = IA  (fromInteger i) 
+instance Expp Int where
+  toExp = IA 
 
 schemaOfPipe::Pipe->Schema
 schemaOfPipe (s, _) = s
@@ -106,46 +123,53 @@ typeOf (Selector (Pos x) ) (t, _) =  if x > length t - 1
                                    else
                                     return (t !! x)
 
-typeOf (Selector (Name n)) (t, _) = case lookup (Just n) t of  
+typeOf (Selector (Name n)) (t, p) = case lookup (Just n) t of  
                                         Just v -> return (Just n, v)
-                                        Nothing -> fail $ "don't find: " ++ n
-
+                                        Nothing -> fail $ "don't find: " ++ n ++ " in " ++ (show t) ++ (show p)
 
 rename::String->Either String NamedT->Either String NamedT
 rename _ (Left s) = Left s
 rename newName (Right (_, typ)) = Right (Just newName, typ)
 
 
-p0 = Selector (Pos 0)
-p1 = Selector (Pos 1)
-p2 = Selector (Pos 2)
-p3 = Selector (Pos 3)
-p4 = Selector (Pos 4)
+p0 =  (Pos 0)
+p1 =  (Pos 1)
+p2 =  (Pos 2)
+p3 =  (Pos 3)
+p4 =  (Pos 4)
 
-c::String->Exp
-c name = Selector (Name name)
+c::String->Selector
+c name = (Name name)
 
-eq::Exp->Exp->Condition
-eq = Comp Eq
+eq :: (Expp a, Expp b) => a -> b -> Condition
+eq a b = Comp Eq (toExp a) (toExp b)
 
-elem :: Exp -> [Exp] -> Condition
-elem x s = opJoin Or expressions 
+elem :: (Expp a, Expp b) => a -> [b] -> Condition
+elem x' s' = opJoin Or expressions 
     where
+        x = toExp x'
+        s = map toExp s'
         expressions = map (eq x) s
         opJoin o (x:[]) = x
         opJoin o (x:xs) = o x $ opJoin o xs
         
+cut :: (Selectorr a, Feedable f) => [(a, String)] -> f -> PipeE
+cut selectors  = select (map (\(s, name) -> Exp (toExp (toSelector s)) (Just name)) selectors)
 
-
-select::Feedable a =>[(Exp, String)]->a->PipeE
-select xs prev = case gen_type of 
-        Left s -> Left s
-        Right t ->  Right (t, Generate xs p)
+select::Feedable a =>[GeneratingExp]->a->PipeE
+select xs prev = do
+        types <- mapM typeOfGenExp xs
+        let gen_type = concat types
+        return (gen_type, Generate xs p)
         where
             p = toPipe prev
-            gen_type::Either String [NamedT]
-            gen_type =  sequence $ map renameType xs
-            renameType = \(exp, name) -> rename name $ typeOf exp p
+            typeOfGenExp::GeneratingExp->Either String [NamedT]
+            typeOfGenExp (Exp e (Just name)) = sequence [rename name $ typeOf e p]
+            typeOfGenExp (Exp e Nothing) = sequence [ typeOf e p]
+            typeOfGenExp (Flatten selector) = case typeOf (Selector selector) p of
+                    Left s -> Left s 
+                    Right (_, T schema) -> Right schema
+
 
 groupBy::Feedable a => [Exp]-> a -> PipeE
 groupBy xs prev = 
@@ -170,6 +194,7 @@ groupBy xs prev =
             groupValueType::Either String [NamedT]
             groupValueType = let (orig_typ, _) = p in 
                              Right [(Just "elements", B orig_typ)]
+
 
 comparableTypes::NamedT->NamedT->Bool
 comparableTypes (_, typ1) (_, typ2) =  -- we are very strict here. No casting accepted! 
@@ -236,7 +261,24 @@ COUNT(relevant_shows.user_id) as showcount;
 
 
 freq::Feedable a => [Selector]->a -> PipeE
-freq col = groupBy (map Selector col) >>> select [(c "group", "group"), (Count  (Pos 1), "count") ]
+freq col = groupBy (map Selector col) >>> select [Flatten $ Pos 0, Exp ( Count  (Pos 1)) (Just "count") ]
+
+(<:>)::String->Exp->(Exp, String)
+n <:> e = (e, n)
+
+join :: (Feedable a, Feedable b) => Either String a -> Either String b -> String -> PipeE
+join (Left s) _  _ = Left s
+join _  (Left s) _ = Left s
+
+join (Right f1)  (Right f2) name = do
+          let pipe1@(schema1, cmd1) = toPipe f1
+          let pipe2@(schema2, cmd2) = toPipe f2
+          typ1 <- typeOf (Selector $ Name name) pipe1
+          typ2 <- typeOf (Selector $ Name name) pipe2
+          if typ1 /= typ2 then fail $ "can't join by incompatible " ++ name ++ show typ1 ++ " and " ++ name ++ show typ2
+          else
+            return ([(Just "NOT", I)], Join FullOuter pipe1 (Name name) pipe2  (Name name))
+
 
 
 {-
