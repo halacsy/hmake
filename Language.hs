@@ -108,6 +108,13 @@ myConcat (Right t1) (Right t2) = (Right (t1 ++t2))
 typeOf::Exp->Pipe->Either String NamedT
 typeOf (IA _) _ = Right (Nothing, I)
 typeOf (SA _) _ = Right (Nothing, S)
+typeOf (Sum selector) p = do
+                            t <- typeOf (Selector selector) p
+                            case t of
+                              (Just n, L) -> return (Just $ "sumOf" ++ n, L)
+                              (Just n, I) -> return (Just $ "sumOf" ++ n, L)
+                              (Nothing, _) -> fail $ "can't sum noname cols"
+                              otherwise -> fail $ "can't sum non integral type " ++ (show t) ++ " in " ++ (show p)
 typeOf (Count selector) p = -- exr must point to a BAG
                             do
                                 t <- typeOf (Selector selector) p 
@@ -174,7 +181,7 @@ select xs prev = do
             typeOfGenExp::GeneratingExp->Either String [NamedT]
             typeOfGenExp (Exp e (Just name)) = sequence [rename name $ typeOf e p]
             typeOfGenExp (Exp e Nothing) = sequence [ typeOf e p]
-            typeOfGenExp (NestedProjection sel1 sels) = mapM (\sel -> typeOf (Selector $ ComplexSelector sel1 sel) p) sels 
+            typeOfGenExp (NestedProjection sel1 sels) = mapM (\sel -> typeOf (Selector $ ComplexSelector sel1 sel) p) sels >>= (\schema -> Right [(Just "elements", B schema)]) 
             typeOfGenExp (Flatten selector) = case typeOf (Selector selector) p of
                     Left s -> Left s 
                     Right (_, T schema) -> Right schema
@@ -200,6 +207,7 @@ groupBy xs prev =
                             do
                                 x <- sequence $ map (\t -> typeOf t p) xs
                                 return [(Just "group", T x )]
+
             groupValueType::Either String [NamedT]
             groupValueType = let (orig_typ, _) = p in 
                              Right [(Just "elements", B orig_typ)]
@@ -271,6 +279,11 @@ COUNT(relevant_shows.user_id) as showcount;
 
 freq::(Selectorr s, Feedable a) => [s]->a -> PipeE
 freq col = groupBy (map (toExp . toSelector) col) >>> select [Flatten $ Pos 0, Exp ( Count  (Pos 1)) (Just "count") ]
+
+--group::(Selectorr s, Feedable a) => [s]->a -> PipeE
+group col fun = groupBy (map (toExp . toSelector) col) >>> select [Flatten $ Pos 0, Exp ( fun ) (Just "count") ]
+
+cum col = group col (Count  (Pos 1))
 
 groupByCol::(Selectorr s, Feedable a) => s -> a -> PipeE
 groupByCol col f = do

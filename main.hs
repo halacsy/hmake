@@ -36,14 +36,16 @@ kpi_code = 4
 kpi_user = 5
 kpi_prezi = 6
 
-base = "/user/hp/"
---base = "/Users/hp/"
+--base = "/user/hp/"
+base = "/Users/hp/"
 out_base name = base ++ name 
 
 -- log files come in every day. Some log messages are late -> arrive X days later they are about
 -- every day can come a fact about any day between today and 20 before
 
-kpi_log_sorted 1242 = Right $ InputFile kpi_schema (PigFile  "vacak.log")
+kpi_log_sorted 1241 = Right $ InputFile kpi_schema (PigFile  "vacak1.log")
+kpi_log_sorted 1242 = Right $ InputFile kpi_schema (PigFile  "vacak2.log")
+
 kpi_log_sorted pday = pig_node (union [kpi_log_raw d | d <- [pday .. pday + 5] ] 
                                 >>= filter ( c "date" `eq`  SA (showPDayAsGregorian pday) ))
                                 (base ++ "/kpi-sorted-" ++ (show pday)) >>= optionalInput
@@ -65,13 +67,16 @@ edit_logs pday = kpi_log_sorted pday >>= filter (c "type" `eq` kpiSave)
 daily_user_prezi_edits day = pig_node ( edit_logs day
                                         >>= cut [("p1", "user_id"), ("p2", "prezi_id")] 
                                         >>= freq ["user_id", "prezi_id"]   
-                                        >>= groupByCol "user_id")
+                                      )
                               (base ++ "daily_user_prezi_edits-" ++ show day)
 
 acc_user_prezi_edits 1240 = daily_user_prezi_edits 1240
 
-acc_user_prezi_edits day = pig_node (join (daily_user_prezi_edits (day-1))
-                                          (daily_user_prezi_edits day) "user_id")
+acc_user_prezi_edits day = pig_node (union [ daily_user_prezi_edits (day-1),
+                                             daily_user_prezi_edits  day 
+                                           ]
+                                     >>= group ["user_id", "prezi_id"] (Sum $ ComplexSelector (Pos 1) (Name "count")) )
+
                               (base ++ "acc_user_prezi_edits-" ++ show day)
 -- prezi+edit, osszes edit
 
@@ -104,6 +109,6 @@ main = do
  -- print $ kpi_log_sorted 12
  let range = [ pDayFromGregorian 2012 08 1 .. pDayFromGregorian 2012 08 29   ]
 -- doIt $ doAllOf  [facebook_active_users d | d<- range]
- doIt $ daily_user_prezi_edits 1242
+ doIt $ acc_user_prezi_edits 1242
 
     

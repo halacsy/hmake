@@ -5,6 +5,7 @@ import Language hiding (join)
 import Data.List hiding (filter, group, groupBy)
 import Schema
 import Graph
+
 join delim l = concat (intersperse delim l)
 
 class Pprint a where
@@ -32,6 +33,7 @@ instance   Pprint Exp where
     pprint (SA s) = "'" ++ s ++ "'"
     pprint (Selector (Pos i)) = "$" ++ (show i)
     pprint (Selector (Name s)) = s
+    pprint (Sum e) = "SUM (" ++ pprint (Selector e) ++ ")"
     pprint (Count e) = "COUNT(" ++ pprint (Selector e) ++ ")"
     pprint (Selector (ComplexSelector sel1 sel2)) = pprint (Selector sel1) ++ "." ++ pprint (Selector sel2)
     {-
@@ -59,7 +61,7 @@ instance  Pprint ArithmeticOperator where
 
 typ2str I = "int"
 typ2str S = "bytearray"
-typ2str (B s) = "bag {"  ++ (schema2str s) ++ "}"
+typ2str (B s) = "bag {T:("  ++ (schema2str s) ++ ")}"
 typ2str (T s) = "tuple ("  ++ (schema2str s) ++ ")"
 typ2str L = "long"
 schema2str::Schema->String
@@ -91,20 +93,43 @@ forechExps2Str xs = join "," (map printNamedExp xs)
                             | otherwise = s ++ " as " ++ name
         printNamedExp (Exp exp (Just name)) = pprint exp ++ " as " ++ name
         printNamedExp (Exp exp Nothing) = pprint exp 
-        printNamedExp (NestedProjection sel xs) = pprint (Selector sel) ++ ".(" ++ join "," (map (pprint . Selector) xs) ++ ")"
+        printNamedExp (NestedProjection sel xs) = pprint (Selector sel) ++ ".(" ++ join "," (map (pprint . Selector) xs) ++ ") as elements"
         printNamedExp (Flatten selector) = "FLATTEN(" ++ pprint (Selector selector) ++ ")"
         
 
+mapChars '/' = 'p'
+mapChars '*' = '_'
+mapChars '{' = '_'
+mapChars '}' = '_'
+mapChars ',' = '_'
+mapChars '.' = '_'
+mapChars '-' = '_'
+
+
+
+mapChars c = c
+
+name2Alias name = map mapChars name
 
 -- TODO: lehet ket load is
 pp::Pipe->(Ident, String)
-pp (typ, (Load name )) = ("A", "A = LOAD '" ++ name ++ "' USING PigStorage(' ') AS (" ++ (schema2str typ) ++ ");")
+pp (typ, (Load name )) = let alias = name2Alias name in 
+                         (alias, alias ++ " = LOAD '" ++ name ++ "' USING PigStorage(' ') AS (" ++ (schema2str typ) ++ ");")
 pp (_, (GroupBy exps pipe)) = pp_pipe (\i -> " GROUP " ++ i  ++ " BY " ++ (exps2str True exps)) pipe
 pp (_, (Generate exps pipe)) = pp_pipe (\i -> " FOREACH " ++ i  ++ " GENERATE " ++ (forechExps2Str  exps)) pipe
 pp (_, (Filter cond pipe)) = pp_pipe (\i -> " FILTER " ++ i  ++ " BY " ++ (pprint cond)) pipe
 pp (_, (Distinct pipe)) = pp_pipe (\i -> " DISTINCT " ++ i) pipe
 pp (_, (Node (InputFile typ (PigFile file) ))) = pp (typ, (Load file))
 pp (_, (Node (FileGenerator typ _ (PigFile file) _  ))) = pp (typ, (Load file))
+pp (_, (Join typ pipe1 sel1 pipe2 sel2)) = (ident, prev_text ++ "\n" ++ this_text)
+                 where
+                    (pident1, prev_text1) = pp pipe1
+                    (pident2, prev_text2) = pp pipe2
+                    prev_text = prev_text1 ++ "\n" ++ prev_text2
+                    this_text = ident ++ " = " ++ "JOIN " ++ pident1 ++ " BY " ++ (pprint (Selector sel1)) ++ " full, " ++ pident2 ++ " BY " ++ (pprint (Selector sel2)) ++ ";"
+                    ident = pident1 ++ pident2;
+
+
 pp (typ, (Union pipes)) = 
     let inputNodes = map toNode pipes in
     let globbedInput = toGlob $ map nameOfFile $ getOutputFiles inputNodes in
@@ -112,17 +137,6 @@ pp (typ, (Union pipes)) =
         where 
             toNode (_, (Node n)) = n
             toNode _ = undefined
-printSortOut::Pipe->[(Condition, File)]->String
-printSortOut pipe slots = pipeStr ++ "\n" ++ split  ++ (concat stores)
-    where 
-        (ident, pipeStr) = pp pipe
-        rankedSlots::[(Int, (Condition, File))]
-        rankedSlots = zip [5..] slots
-        slotName r = "A" ++ (show r)
-        conds = map (\(r, (c, _)) -> (slotName r) ++ " IF " ++ pprint c) rankedSlots
-        -- SPLIT A INTO A1 IF (date == '2012-05-05'), A2 IF (date == '2012-05-06');
-        split =  "SPLIT " ++ ident ++ " INTO " ++ (join ", " conds) ++ ";\n"
-        stores = map (\(r, (_, (PigFile file))) -> "STORE " ++ (slotName r) ++ " INTO '" ++ file ++ "' USING PigStorage(' ') ;\n") rankedSlots
 
 -- this can be more haskell like. Creates from
 -- /Users/hp/log-1, /Users/hp/log-2 -> /Users/hp/log-{1,2}

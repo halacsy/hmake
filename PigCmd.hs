@@ -9,7 +9,7 @@ import Prelude hiding (filter)
 import Data.List (intersperse, foldl')
 import Data.Bits
 import Control.Monad.Instances
-import Print (pigScriptWithStore, printSortOut)
+import Print (pigScriptWithStore)
 import System.Exit
 
 join delim l = concat (intersperse delim l)
