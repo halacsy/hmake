@@ -64,20 +64,24 @@ edit_logs::PDay->Either String Pipe
 edit_logs pday = kpi_log_sorted pday >>= filter (c "type" `eq` kpiSave)
 
 
+vacak day = edit_logs day >>= cut [("p1", "user_id"), ("p2", "prezi_id")] 
+                          >>= freq ["user_id", "prezi_id"]  
+
 daily_user_prezi_edits day = pig_node ( edit_logs day
                                         >>= cut [("p1", "user_id"), ("p2", "prezi_id")] 
                                         >>= freq ["user_id", "prezi_id"]   
                                       )
                               (base ++ "daily_user_prezi_edits-" ++ show day)
 
-acc_user_prezi_edits 1240 = daily_user_prezi_edits 1240
+acc_user_prezi_edits 1235 = daily_user_prezi_edits 1235
 
-acc_user_prezi_edits day = pig_node (union [ daily_user_prezi_edits (day-1),
-                                             daily_user_prezi_edits  day 
+acc_user_prezi_edits day = pig_node (union [ acc_user_prezi_edits (day-1),
+                                             daily_user_prezi_edits  day
                                            ]
                                      >>= group ["user_id", "prezi_id"] (Sum $ ComplexSelector (Pos 1) (Name "count")) )
 
                               (base ++ "acc_user_prezi_edits-" ++ show day)
+
 -- prezi+edit, osszes edit
 
 {- 

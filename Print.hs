@@ -4,7 +4,7 @@ import Prelude hiding (filter)
 import Language hiding (join)
 import Data.List hiding (filter, group, groupBy)
 import Schema
-import Graph
+import Language hiding (join)
 
 join delim l = concat (intersperse delim l)
 

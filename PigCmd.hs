@@ -1,7 +1,7 @@
 module PigCmd where
 
 import Language 
-import Graph 
+
 
 import System.IO
 import System.Process
@@ -32,7 +32,7 @@ dumpPigToTemp script = do
        fp = pig2File script
   
 
-pig_cmd::Pipe->String->Execution
+pig_cmd::Pipe->String->Bool->IO String
 pig_cmd pipe outFile execute =
     
     if execute then do
@@ -77,6 +77,7 @@ pig trans inputNodes o =
             return (FileGenerator outputSchema inputNodes' (PigFile o) execution)
      
 -}
+{- 
 pig_node::Either String Pipe->String->Either String Node
 pig_node (Left s) _ = Left s
 pig_node (Right pipe) o = -- we need to find the dependencies
@@ -84,16 +85,7 @@ pig_node (Right pipe) o = -- we need to find the dependencies
         let dependencies =  getPipeDependencies pipe in
         Right $ FileGenerator (schemaOfPipe pipe) (All dependencies) (PigFile o) (pig_cmd pipe o)
 
-optionalInput::Node -> Either String Node
-optionalInput x@(InputFile _ _) = Right x
-optionalInput x@(FileGenerator _ (Any dependencies) _ _ ) = Right x
-optionalInput (FileGenerator p (All dependencies) f c ) = Right $ FileGenerator p (Any dependencies) f c
-
-doAllOf::[Either String Node] -> Either String Node
-doAllOf nodes = do
-    nodes' <- sequence nodes
-    return $ TaskGroup nodes'
-    
+-}
 {-main = do
     print $ pig (pig_command) [input] "hallo"
 -}

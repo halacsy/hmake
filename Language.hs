@@ -2,12 +2,71 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 module Language where
 import Data.Maybe
-import Graph
+
 import Schema
 import Control.Monad.Instances
 import Control.Monad
-import Prelude hiding (filter, elem)
+import qualified Prelude 
+import Prelude hiding (filter)
 import Data.List (deleteBy)
+
+
+type FileName = String
+data File = UnixFile FileName  | PigFile FileName deriving Show
+
+nameOfFile::File->FileName
+nameOfFile (PigFile name) = name
+
+data Node = 
+  InputFile Schema File |
+  FileGenerator Schema Dependency File Pipe |
+    TaskGroup [Node] deriving (Show)
+
+pig_node::Either String Pipe->String->Either String Node
+pig_node (Left s) _ = Left s
+pig_node (Right pipe) o = -- we need to find the dependencies
+
+        let dependencies =  getPipeDependencies pipe in
+        Right $ FileGenerator (schemaOfPipe pipe) (All dependencies) (PigFile o) pipe
+
+
+data Dependency = All [Node] | Any [Node] deriving (Show)
+
+optionalInput::Node -> Either String Node
+optionalInput x@(InputFile _ _) = Right x
+optionalInput x@(FileGenerator _ (Any dependencies) _ _ ) = Right x
+optionalInput (FileGenerator p (All dependencies) f c ) = Right $ FileGenerator p (Any dependencies) f c
+
+doAllOf::[Either String Node] -> Either String Node
+doAllOf nodes = do
+    nodes' <- sequence nodes
+    return $ TaskGroup nodes'
+    
+    
+source::Dependency->[Node]
+source (All nodes) = nodes
+source (Any nodes) = nodes
+
+
+-- later node can inherit schema
+schemaOfNode::Node->Schema
+schemaOfNode (InputFile s _) = s
+schemaOfNode (FileGenerator s _ _ _) = s
+
+outputOfNode::Node->Maybe File
+outputOfNode (InputFile _ f) = Just f
+outputOfNode (FileGenerator _ _ f _)  = Just f
+outputOfNode (TaskGroup _) = Nothing
+
+getOutputFiles::[Node]->[File]
+getOutputFiles nodes = map fromJust $ Prelude.filter isJust $ map outputOfNode nodes
+
+
+getActualFile (UnixFile f) = f
+getActualFile (PigFile f) = "/mnt/hdfs" ++ f
+
+
+
 data Exp = IA Int | SA String | Sub Exp Exp | Selector Selector | Sum Selector | Count Selector  deriving (Show, Eq)
 
 -- TODO rename to Exp
@@ -266,7 +325,7 @@ union xs = -- TODO check scheme equality
           let p' = map toPipe p
           let schema = schemaOfPipe (head p')
           return (schema, Union p')
-       
+ 
 --(>>>)::Transformer->Transformer->Transformer
 x >>> y = \p -> (Right p) >>= x >>= y
     

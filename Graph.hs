@@ -4,6 +4,8 @@ import Data.Maybe
 import System.Log.Logger
 import System.Log.Handler.Syslog
 import Schema
+import Language hiding (filter)
+import PigCmd (pig_cmd)
 import System.Posix.Types(EpochTime)
 import System.Posix.Files(modificationTime, getFileStatus)
 import System.IO.Error 
@@ -29,51 +31,12 @@ type Execution = Bool -> IO String
 
 
 
-type FileName = String
-data File = UnixFile FileName  | PigFile FileName deriving Show
-
-nameOfFile::File->FileName
-nameOfFile (PigFile name) = name
-
-data Node = 
-	InputFile Schema File |
-	FileGenerator Schema Dependency File Execution |
-    TaskGroup [Node]
-
-data Dependency = All [Node] | Any [Node] deriving (Show)
-
-source::Dependency->[Node]
-source (All nodes) = nodes
-source (Any nodes) = nodes
-
-instance Show Node where
-    show (InputFile schema file) = "input::" ++ (show file) ++ " AS " ++ show schema
-    show (FileGenerator schema inputs file _) = "gen:: " ++ show inputs ++ "schema: " ++ show schema ++ show file
-
-
-
--- later node can inherit schema
-schemaOfNode::Node->Schema
-schemaOfNode (InputFile s _) = s
-schemaOfNode (FileGenerator s _ _ _) = s
-
 
 -- this is other viewpoint -> a GenNode gets input, you name the output and gives Node
 -- which can connected
 --type GenNode = [Node]->File->Node
 -- TODO why is this Maybe
 
-outputOfNode::Node->Maybe File
-outputOfNode (InputFile _ f) = Just f
-outputOfNode (FileGenerator _ _ f _)  = Just f
-outputOfNode (TaskGroup _) = Nothing
-
-getOutputFiles::[Node]->[File]
-getOutputFiles nodes = map fromJust $ filter isJust $ map outputOfNode nodes
-
-
-getActualFile (UnixFile f) = f
-getActualFile (PigFile f) = "/mnt/hdfs" ++ f
 
 modTime::File->IO (Maybe EpochTime)
 modTime f = do
@@ -133,12 +96,11 @@ execute2 _ (InputFile _ _)  = return []
 execute2 run (TaskGroup nodes) = do 
                                     c <- sequence $ map (execute2 run) nodes
                                     return $ concat c
-execute2 run (FileGenerator _ deps _ cmd)   = execute' run deps cmd
-execute' run deps cmd =
+execute2 run (FileGenerator _ deps (PigFile o) pipe)   = execute' run deps o pipe
+execute' run deps o pipe =
     do
         c <- sequence $ map (execute2 run) (source deps) 
-        cmdS <- cmd False
-      --  myLog ("starting cmd" ++ cmdS)
+        let cmd = (pig_cmd pipe o)
         my <- cmd run
       --  myLog ("end of cmd" ++ my)
 
@@ -147,14 +109,6 @@ execute' run deps cmd =
             flatten :: [[a]] -> [a]
             flatten l = foldl (++) [] l
            
-execution::Node->IO [Execution]
-execution (InputFile _ _) = return []
-execution (FileGenerator _ deps o cmd)  = do
-        c <- sequence $ map execution (source deps)
-        return ( (concat c) ++ [ cmd ])
-      
-
-
 execute::   Bool->Execution -> IO String
 execute run cmd = do
     r <- cmd run
