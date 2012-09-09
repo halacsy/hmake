@@ -46,9 +46,9 @@ out_base name = base ++ name
 kpi_log_sorted 1241 = Right $ InputFile kpi_schema (PigFile  "vacak1.log")
 kpi_log_sorted 1242 = Right $ InputFile kpi_schema (PigFile  "vacak2.log")
 
-kpi_log_sorted pday = pig_node (union [kpi_log_raw d | d <- [pday .. pday + 5] ] 
+kpi_log_sorted pday = pig_node (union [kpi_log_raw d | d <- [pday .. pday + 1] ] 
                                 >>= filter ( c "date" `eq`  SA (showPDayAsGregorian pday) ))
-                                (base ++ "/kpi-sorted-" ++ (show pday)) >>= optionalInput
+                                (base ++ "/kpi-sorted-" ++ (show pday)) -- >>= optionalInput
 
 daily_uniq_users  pday = pig_node (  kpi_log_sorted pday
                                       >>= filter ( c "type" `elem` kpiCodesWithUserActivity )  

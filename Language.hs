@@ -12,37 +12,32 @@ import Data.List (deleteBy)
 
 
 type FileName = String
-data File = UnixFile FileName  | PigFile FileName deriving Show
+data File = UnixFile FileName  | PigFile FileName deriving (Show, Eq)
 
 nameOfFile::File->FileName
 nameOfFile (PigFile name) = name
 
 data Node = 
   InputFile Schema File |
-  FileGenerator Schema Dependency File Pipe |
-    TaskGroup [Node] deriving (Show)
+  FileGenerator Schema File Pipe |
+  TaskGroup [Node] deriving (Show, Eq)
 
 pig_node::Either String Pipe->String->Either String Node
 pig_node (Left s) _ = Left s
 pig_node (Right pipe) o = -- we need to find the dependencies
 
         let dependencies =  getPipeDependencies pipe in
-        Right $ FileGenerator (schemaOfPipe pipe) (All dependencies) (PigFile o) pipe
+        Right $ FileGenerator (schemaOfPipe pipe) (PigFile o) pipe
 
 
 data Dependency = All [Node] | Any [Node] deriving (Show)
-
-optionalInput::Node -> Either String Node
-optionalInput x@(InputFile _ _) = Right x
-optionalInput x@(FileGenerator _ (Any dependencies) _ _ ) = Right x
-optionalInput (FileGenerator p (All dependencies) f c ) = Right $ FileGenerator p (Any dependencies) f c
 
 doAllOf::[Either String Node] -> Either String Node
 doAllOf nodes = do
     nodes' <- sequence nodes
     return $ TaskGroup nodes'
     
-    
+
 source::Dependency->[Node]
 source (All nodes) = nodes
 source (Any nodes) = nodes
@@ -51,11 +46,11 @@ source (Any nodes) = nodes
 -- later node can inherit schema
 schemaOfNode::Node->Schema
 schemaOfNode (InputFile s _) = s
-schemaOfNode (FileGenerator s _ _ _) = s
+schemaOfNode (FileGenerator s _ _) = s
 
 outputOfNode::Node->Maybe File
 outputOfNode (InputFile _ f) = Just f
-outputOfNode (FileGenerator _ _ f _)  = Just f
+outputOfNode (FileGenerator _  f _)  = Just f
 outputOfNode (TaskGroup _) = Nothing
 
 getOutputFiles::[Node]->[File]
@@ -101,7 +96,7 @@ class Feedable a where
          
 instance Feedable Node where
   toPipe node@(InputFile schema _ ) = (schema, Node node)
-  toPipe node@(FileGenerator schema _ _ _ ) = (schema, Node node)
+  toPipe node@(FileGenerator schema _ _ ) = (schema, Node node)
  
 
 instance Feedable Pipe where
@@ -113,7 +108,7 @@ instance Feedable (Pipe) where
 -- we need a better name for this, PipeE. Maybe Pipe must be hided and PipeE can be public
 type PipeE = Either String Pipe 
 
-data GeneratingExp = Flatten Selector | Exp Exp (Maybe String) | NestedProjection Selector [Selector] deriving (Show)
+data GeneratingExp = Flatten Selector | Exp Exp (Maybe String) | NestedProjection Selector [Selector] deriving (Show, Eq)
 data PipeCmd = Generate [GeneratingExp] Pipe 
                | GroupBy [Exp] Pipe 
                | Filter Condition Pipe 
@@ -121,7 +116,7 @@ data PipeCmd = Generate [GeneratingExp] Pipe
                | Union [Pipe]
                | Node Node
                | Join JoinType Pipe Selector Pipe Selector
-               | Load String deriving (Show)
+               | Load String deriving (Show, Eq)
 
 data JoinType = Inner | LeftOuter | RightOuter | FullOuter deriving (Show, Eq)
 
@@ -304,7 +299,7 @@ load s t = Right (t, Load s)
 input::Either String Node->PipeE
 input (Left s) = Left s
 input (Right  node@(InputFile schema _ )) = Right (schema, Node node)
-input (Right node@(FileGenerator schema _ _ _ )) = Right (schema, Node node)
+input (Right node@(FileGenerator schema _ _ )) = Right (schema, Node node)
 
 {-
 union::Feedable a => [Either String a] -> PipeE
