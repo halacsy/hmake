@@ -19,7 +19,7 @@ nameOfFile (PigFile name) = name
 
 data Node = 
   InputFile Schema File |
-  FileGenerator File Pipe |
+  Transformer File Pipe |
   TaskGroup [Node] deriving (Show, Eq)
 
 pig_node::Either String Pipe->String->Either String Node
@@ -27,7 +27,7 @@ pig_node (Left s) _ = Left s
 pig_node (Right pipe) o = -- we need to find the dependencies
 
         let dependencies =  getPipeDependencies pipe in
-        Right $ FileGenerator (PigFile o) pipe
+        Right $ Transformer (PigFile o) pipe
 
 
 data Dependency = All [Node] | Any [Node] deriving (Show)
@@ -46,11 +46,11 @@ source (Any nodes) = nodes
 -- later node can inherit schema
 schemaOfNode::Node->Schema
 schemaOfNode (InputFile s _) = s
-schemaOfNode (FileGenerator _ (s, p)) = s
+schemaOfNode (Transformer _ (s, p)) = s
 
 outputOfNode::Node->Maybe File
 outputOfNode (InputFile _ f) = Just f
-outputOfNode (FileGenerator  f _)  = Just f
+outputOfNode (Transformer  f _)  = Just f
 outputOfNode (TaskGroup _) = Nothing
 
 getOutputFiles::[Node]->[File]
@@ -96,7 +96,7 @@ class Feedable a where
          
 instance Feedable Node where
   toPipe node@(InputFile schema _ ) = (schema, Node node)
-  toPipe node@(FileGenerator _ (s, p) ) = (s, Node node)
+  toPipe node@(Transformer _ (s, p) ) = (s, Node node)
  
 
 instance Feedable Pipe where
@@ -299,7 +299,7 @@ load s t = Right (t, Load s)
 input::Either String Node->PipeE
 input (Left s) = Left s
 input (Right  node@(InputFile schema _ )) = Right (schema, Node node)
-input (Right node@(FileGenerator  _ (schema,p) )) = Right (schema, Node node)
+input (Right node@(Transformer  _ (schema,p) )) = Right (schema, Node node)
 
 {-
 union::Feedable a => [Either String a] -> PipeE

@@ -120,7 +120,7 @@ pp (_, (Generate exps pipe)) = pp_pipe (\i -> " FOREACH " ++ i  ++ " GENERATE " 
 pp (_, (Filter cond pipe)) = pp_pipe (\i -> " FILTER " ++ i  ++ " BY " ++ (pprint cond)) pipe
 pp (_, (Distinct pipe)) = pp_pipe (\i -> " DISTINCT " ++ i) pipe
 pp (_, (Node (InputFile typ (PigFile file) ))) = pp (typ, (Load file))
-pp (_, (Node (FileGenerator (PigFile file) (typ, _)  ))) = pp (typ, (Load file))
+pp (_, (Node (Transformer (PigFile file) (typ, _)  ))) = pp (typ, (Load file))
 pp (_, (Join typ pipe1 sel1 pipe2 sel2)) = (ident, prev_text ++ "\n" ++ this_text)
                  where
                     (pident1, prev_text1) = pp pipe1

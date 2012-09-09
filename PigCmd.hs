@@ -74,7 +74,7 @@ pig trans inputNodes o =
             pipe <- (load globbedInput inputSchema >>= trans)
             let outputSchema = schemaOfPipe pipe
             let execution = pig_cmd pipe o 
-            return (FileGenerator outputSchema inputNodes' (PigFile o) execution)
+            return (Transformer outputSchema inputNodes' (PigFile o) execution)
      
 -}
 {- 
@@ -83,7 +83,7 @@ pig_node (Left s) _ = Left s
 pig_node (Right pipe) o = -- we need to find the dependencies
 
         let dependencies =  getPipeDependencies pipe in
-        Right $ FileGenerator (schemaOfPipe pipe) (All dependencies) (PigFile o) (pig_cmd pipe o)
+        Right $ Transformer (schemaOfPipe pipe) (All dependencies) (PigFile o) (pig_cmd pipe o)
 
 -}
 {-main = do
@@ -98,7 +98,7 @@ x = chain $ load "VACAK1"
 y = pig chain [InputFile "hello"] "hallo"
 
 e::Node->IO String
-e (FileGenerator _ _ cmd) = cmd True
+e (Transformer _ _ cmd) = cmd True
 
 main = do 
     res <- e y

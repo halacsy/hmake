@@ -62,7 +62,7 @@ _uniq = ux_pipe "sort | uniq" []
 
 
 ux_rule::[Node] -> PipeCmd -> File -> Node
-ux_rule i cmd o = FileGenerator i o (cmd i o)
+ux_rule i cmd o = Transformer i o (cmd i o)
 
 
 grep::String->GenNode

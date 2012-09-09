@@ -73,7 +73,7 @@ reduce t@(TaskGroup nodes) =  do
                                 children <- sequence $ map reduce nodes
                                 return $ ExecutionPlan children Nothing
 
-reduce node@(FileGenerator output pipe@(schema, pipeCmd)) = 
+reduce node@(Transformer output pipe@(schema, pipeCmd)) = 
 		do
             let deps = getDependencies pipeCmd
             -- this must be executed iif output is too old
