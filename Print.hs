@@ -120,7 +120,8 @@ pp (_, (Generate exps pipe)) = pp_pipe (\i -> " FOREACH " ++ i  ++ " GENERATE " 
 pp (_, (Filter cond pipe)) = pp_pipe (\i -> " FILTER " ++ i  ++ " BY " ++ (pprint cond)) pipe
 pp (_, (Distinct pipe)) = pp_pipe (\i -> " DISTINCT " ++ i) pipe
 pp (_, (Node (InputFile typ (PigFile file) ))) = pp (typ, (Load file))
-pp (_, (Node (Transformer (PigFile file) (typ, _)  ))) = pp (typ, (Load file))
+pp (_, (Node (Transformer (Just (PigFile file)) (typ, _)  ))) = pp (typ, (Load file))
+pp (_, (Node (Transformer Nothing pipe))) = pp pipe
 pp (_, (Join typ pipe1 sel1 pipe2 sel2)) = (ident, prev_text ++ "\n" ++ this_text)
                  where
                     (pident1, prev_text1) = pp pipe1
@@ -130,13 +131,10 @@ pp (_, (Join typ pipe1 sel1 pipe2 sel2)) = (ident, prev_text ++ "\n" ++ this_tex
                     ident = pident1 ++ pident2;
 
 
-pp (typ, (Union pipes)) = 
-    let inputNodes = map toNode pipes in
+pp (typ, (Union inputNodes)) = 
     let globbedInput = toGlob $ map nameOfFile $ getOutputFiles inputNodes in
     pp (typ, (Load globbedInput))
-        where 
-            toNode (_, (Node n)) = n
-            toNode _ = undefined
+        
 
 -- this can be more haskell like. Creates from
 -- /Users/hp/log-1, /Users/hp/log-2 -> /Users/hp/log-{1,2}

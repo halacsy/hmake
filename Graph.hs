@@ -77,7 +77,10 @@ reduce node@(Transformer output pipe@(schema, pipeCmd)) =
 		do
             let deps = getDependencies pipeCmd
             -- this must be executed iif output is too old
-            too_old <- have_to_generate output (All deps)
+            too_old <- case output of
+                Just file -> have_to_generate file (All deps)
+                Nothing   -> return False
+
             --  any of it's child must be genereted
             
             children <-  mapM reduce deps
@@ -86,7 +89,9 @@ reduce node@(Transformer output pipe@(schema, pipeCmd)) =
                     print "returning Nill" 
                     return Nil
                  else 
-                    return $ ExecutionPlan children_to_gen $ Just (output, pipe)
+                    -- TODO: theoritically output can't be Nothing here but should
+                    -- be verified by the type system, no?
+                    return $ ExecutionPlan children_to_gen $ Just (fromJust output, pipe)
                  
 execute2::Bool->ExecutionPlan->IO [String]
 execute2 _ Nil  = return []

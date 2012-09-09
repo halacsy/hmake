@@ -19,16 +19,19 @@ nameOfFile (PigFile name) = name
 
 data Node = 
   InputFile Schema File |
-  Transformer File Pipe |
+  Transformer (Maybe File) Pipe |
+
   TaskGroup [Node] deriving (Show, Eq)
 
 pig_node::Either String Pipe->String->Either String Node
 pig_node (Left s) _ = Left s
 pig_node (Right pipe) o = -- we need to find the dependencies
+        Right $ Transformer (Just (PigFile o)) pipe
 
-        let dependencies =  getPipeDependencies pipe in
-        Right $ Transformer (PigFile o) pipe
 
+storedAsHdfs::Either String Node->String->Either String Node
+storedAsHdfs l@(Left _) _ = l
+storedAsHdfs (Right node) o = Right $ Transformer (Just (PigFile o)) (schemaOfNode node, Node node)
 
 data Dependency = All [Node] | Any [Node] deriving (Show)
 
@@ -50,7 +53,7 @@ schemaOfNode (Transformer _ (s, p)) = s
 
 outputOfNode::Node->Maybe File
 outputOfNode (InputFile _ f) = Just f
-outputOfNode (Transformer  f _)  = Just f
+outputOfNode (Transformer  f _)  =  f
 outputOfNode (TaskGroup _) = Nothing
 
 getOutputFiles::[Node]->[File]
@@ -113,7 +116,7 @@ data PipeCmd = Generate [GeneratingExp] Pipe
                | GroupBy [Exp] Pipe 
                | Filter Condition Pipe 
                | Distinct Pipe 
-               | Union [Pipe]
+               | Union [Node]
                | Node Node
                | Join JoinType Pipe Selector Pipe Selector
                | Load String deriving (Show, Eq)
@@ -125,7 +128,7 @@ data SortOut = SortOut Pipe [(Condition, File)]
 
 getDependencies::PipeCmd->[Node]
 getDependencies (Node node) = [node]
-getDependencies (Union ps) = concatMap getPipeDependencies ps
+getDependencies (Union nodes) = nodes
 getDependencies (Generate _ p) = getPipeDependencies p
 getDependencies (GroupBy _ p) = getPipeDependencies p
 getDependencies (Filter _ p) = getPipeDependencies p
@@ -283,11 +286,11 @@ typeOfCondition (Comp operator exp1 exp2) pipe = do
 
 typeOfCondition (Or exp1 exp2) pipe = Right [(Nothing, Bool)]
 
-filter::Feedable a =>Condition->a->PipeE
+filter::Condition->Node->Either String Node
 filter cond prev = do
-                  let p@(t, _) = toPipe prev
+                  let p@(t, _) = (schemaOfNode prev, Node prev)
                   _ <- typeOfCondition cond p
-                  Right (t, Filter cond p)
+                  Right (Transformer Nothing $ (t, Filter cond p))
 
 
 distinct::Feedable a => a -> PipeE
@@ -310,16 +313,16 @@ union xs = Right (schema, Union p)
         schema = schemaOfPipe (head p)
         p  sequence $ map toPipe xs
 -}
-union::Feedable a => [Either String a]->PipeE
+union:: [Either String Node]->Either String Node
 union [] = Left "empty Union"
-union ((Right x):[]) = Right (toPipe x)
+union ((Right x):[]) = Right x
 union ((Left s):[]) = Left s
 union xs = -- TODO check scheme equality
       do 
-          p <- sequence xs
-          let p' = map toPipe p
-          let schema = schemaOfPipe (head p')
-          return (schema, Union p')
+          nodes <- sequence xs
+        
+          let schema = schemaOfNode (head nodes)
+          return (Transformer Nothing (schema, Union nodes))
  
 --(>>>)::Transformer->Transformer->Transformer
 x >>> y = \p -> (Right p) >>= x >>= y

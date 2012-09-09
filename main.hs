@@ -46,10 +46,11 @@ out_base name = base ++ name
 kpi_log_sorted 1241 = Right $ InputFile kpi_schema (PigFile  "vacak1.log")
 kpi_log_sorted 1242 = Right $ InputFile kpi_schema (PigFile  "vacak2.log")
 
-kpi_log_sorted pday = pig_node (union [kpi_log_raw d | d <- [pday .. pday + 1] ] 
-                                >>= filter ( c "date" `eq`  SA (showPDayAsGregorian pday) ))
+kpi_log_sorted pday = storedAsHdfs (union [kpi_log_raw d | d <- [pday .. pday + 1] ] 
+                                    >>= filter ( c "date" `eq`  SA (showPDayAsGregorian pday) ))
                                 (base ++ "/kpi-sorted-" ++ (show pday)) -- >>= optionalInput
 
+{-
 daily_uniq_users  pday = pig_node (  kpi_log_sorted pday
                                       >>= filter ( c "type" `elem` kpiCodesWithUserActivity )  
                                       >>= cut [("p1", "user_id")] 
@@ -83,7 +84,7 @@ acc_user_prezi_edits day = pig_node (union [ acc_user_prezi_edits (day-1),
                               (base ++ "acc_user_prezi_edits-" ++ show day)
 
 -- prezi+edit, osszes edit
-
+-}
 {- 
 monthly_uniq_users::MonthlyFile
 monthly_uniq_users y m = pig_node ( union [daily_uniq_users y m d | d <- days_of_month y m]  
@@ -113,6 +114,6 @@ main = do
  -- print $ kpi_log_sorted 12
  let range = [ pDayFromGregorian 2012 08 1 .. pDayFromGregorian 2012 08 29   ]
 -- doIt $ doAllOf  [facebook_active_users d | d<- range]
- doIt $ acc_user_prezi_edits 1242
+ doIt $ kpi_log_sorted 1243
 
     
