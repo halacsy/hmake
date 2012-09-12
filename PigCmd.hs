@@ -32,18 +32,20 @@ dumpPigToTemp script = do
        fp = pig2File script
   
 
-pig_cmd::Pipe->String->Bool->IO String
-pig_cmd pipe outFile execute =
+pig_cmd::Node->Bool->IO String
+pig_cmd (Transformer (Just (PigFile outFile)) schema pigCmd)  execute =
     
     if execute then do
         -- we delete the file/directory as in pig/hadoop you can't overwrite
         (exit, out, err) <- readProcessWithExitCode "hadoop" ["fs", "-rmr", outFile] ""
         print  $ "delete out" ++ outFile
         executePig script
-    else
+    else do
+        print "pig_cmd"
+        print script
         return $ script
     where
-        script = pigScriptWithStore pipe outFile
+        script = pigScriptWithStore (Transformer Nothing schema pigCmd) outFile
  
 executePig::String->IO String
 executePig script  = do

@@ -5,7 +5,8 @@ import Language hiding (join)
 import Data.List hiding (filter, group, groupBy)
 import Schema
 import Language hiding (join)
-
+import Data.Maybe (mapMaybe)
+import Data.HashTable (hashString)
 join delim l = concat (intersperse delim l)
 
 class Pprint a where
@@ -109,20 +110,23 @@ mapChars '-' = '_'
 
 mapChars c = c
 
-name2Alias name = map mapChars name
+name2Alias name = "A"++ show (abs $ hashString name)
 
 -- TODO: lehet ket load is
-pp::Pipe->(Ident, String)
-pp (typ, (Load name )) = let alias = name2Alias name in 
-                         (alias, alias ++ " = LOAD '" ++ name ++ "' USING PigStorage(' ') AS (" ++ (schema2str typ) ++ ");")
-pp (_, (GroupBy exps pipe)) = pp_pipe (\i -> " GROUP " ++ i  ++ " BY " ++ (exps2str True exps)) pipe
-pp (_, (Generate exps pipe)) = pp_pipe (\i -> " FOREACH " ++ i  ++ " GENERATE " ++ (forechExps2Str  exps)) pipe
-pp (_, (Filter cond pipe)) = pp_pipe (\i -> " FILTER " ++ i  ++ " BY " ++ (pprint cond)) pipe
-pp (_, (Distinct pipe)) = pp_pipe (\i -> " DISTINCT " ++ i) pipe
-pp (_, (Node (InputFile typ (PigFile file) ))) = pp (typ, (Load file))
-pp (_, (Node (Transformer (Just (PigFile file)) (typ, _)  ))) = pp (typ, (Load file))
-pp (_, (Node (Transformer Nothing pipe))) = pp pipe
-pp (_, (Join typ pipe1 sel1 pipe2 sel2)) = (ident, prev_text ++ "\n" ++ this_text)
+pp::Node->(Ident, String)
+pp (InputFile schema (PigFile file)) = let alias = name2Alias file in 
+                         (alias, alias ++ " = LOAD '" ++ file ++ "' USING PigStorage(' ') AS (" ++ (schema2str schema) ++ ");")
+
+-- we load if it was cached
+pp (Transformer (Just file) schema _  ) = pp (InputFile schema file)
+
+-- in any other case we generate the pig script
+pp (Transformer _ _ (GroupBy exps pipe)) = pp_pipe (\i -> " GROUP " ++ i  ++ " BY " ++ (exps2str True exps)) pipe
+pp (Transformer _ _ (Generate exps pipe)) = pp_pipe (\i -> " FOREACH " ++ i  ++ " GENERATE " ++ (forechExps2Str  exps)) pipe
+pp (Transformer _ _ (Filter cond pipe)) = pp_pipe (\i -> " FILTER " ++ i  ++ " BY " ++ (pprint cond)) pipe
+pp (Transformer _ _ (Distinct pipe)) = pp_pipe (\i -> " DISTINCT " ++ i) pipe
+
+pp (Transformer _ _ (Join typ pipe1 sel1 pipe2 sel2)) = (ident, prev_text ++ "\n" ++ this_text)
                  where
                     (pident1, prev_text1) = pp pipe1
                     (pident2, prev_text2) = pp pipe2
@@ -131,11 +135,36 @@ pp (_, (Join typ pipe1 sel1 pipe2 sel2)) = (ident, prev_text ++ "\n" ++ this_tex
                     ident = pident1 ++ pident2;
 
 
-pp (typ, (Union inputNodes)) = 
-    let globbedInput = toGlob $ map nameOfFile $ getOutputFiles inputNodes in
-    pp (typ, (Load globbedInput))
-        
+pp (Transformer _ _ (Union nodes)) = 
+        (ident, predString ++ "\n" ++ ident ++ " = UNION " ++ predAliases ++ " ;")
+    where
+        ident = name2Alias predAliases
+        predAliases = join "," (map fst preds)
+        aliases = getAliasesFromNodes nodes
+        load = getLoadsFromNodes nodes
+        preds = (aliases ++ load)
+        predString = concat (map (\(_, str) -> str ++ "\n") preds)
+       
+getLoadsFromNodes::[Node]->[(Ident, String)]
+getLoadsFromNodes nodes =
+        let files = map nameOfFile $ mapMaybe toLoadFile nodes in 
+        case length files of
+            0  -> []
+            otherwise -> let globbed = toGlob files in 
+                         [pp (InputFile (schemaOfNode $ head nodes) (PigFile globbed))]
+        where
+            toLoadFile (InputFile _ file) = Just file
+            toLoadFile _ = Nothing
 
+
+getAliasesFromNodes::[Node]-> [(Ident, String)]
+getAliasesFromNodes nodes =
+        map pp (mapMaybe maybeTransformer nodes)
+        where
+            maybeTransformer t@(Transformer _ _ _ ) = Just t
+            maybeTransformer _ = Nothing
+
+        
 -- this can be more haskell like. Creates from
 -- /Users/hp/log-1, /Users/hp/log-2 -> /Users/hp/log-{1,2}
 toGlob::[String]->String
@@ -163,7 +192,8 @@ pp_pipe f pipe = (ident, prev_text ++ "\n" ++ this_text)
 
 --pp (typ, (Generate exps pipe)) = 
 
-pigScriptWithStore::Pipe->String->String
+
+pigScriptWithStore::Node->String->String
 pigScriptWithStore pipe file = 
     let (ident, str) = pp pipe in
     str ++ "\n" ++ "STORE " ++ ident ++ " INTO '" ++ file ++ "' USING PigStorage(' ') ;"

@@ -7,6 +7,7 @@ import Graph
 import Cli
 import Schema
 import Prelude hiding (elem, filter)
+import Print
 
 kpiCodesWithUserActivity::[Int]
 kpiCodesWithUserActivity = [0,1, 2,3,4,5,6,10,11,13, 14, 17,19, 20, 21, 30]
@@ -46,29 +47,29 @@ out_base name = base ++ name
 kpi_log_sorted 1241 = Right $ InputFile kpi_schema (PigFile  "vacak1.log")
 kpi_log_sorted 1242 = Right $ InputFile kpi_schema (PigFile  "vacak2.log")
 
-kpi_log_sorted pday = storedAsHdfs (union [kpi_log_raw d | d <- [pday .. pday + 1] ] 
+kpi_log_sorted pday = storedAsHdfs (union [kpi_log_raw d | d <- [pday .. pday + 10] ] 
                                     >>= filter ( c "date" `eq`  SA (showPDayAsGregorian pday) ))
                                 (base ++ "/kpi-sorted-" ++ (show pday)) -- >>= optionalInput
 
-{-
-daily_uniq_users  pday = pig_node (  kpi_log_sorted pday
+
+daily_uniq_users  pday = storedAsHdfs (  kpi_log_sorted pday
                                       >>= filter ( c "type" `elem` kpiCodesWithUserActivity )  
                                       >>= cut [("p1", "user_id")] 
                                       >>= distinct )  
                               (base ++ "daily_uniq_users-" ++ (show pday))
 
-facebook_active_users pday =  pig_node ( union [daily_uniq_users d | d <- [pday - 30 .. pday]]  
+facebook_active_users pday =  storedAsHdfs ( union [daily_uniq_users d | d <- [pday - 30 .. pday]]  
                                       >>= distinct)
                               (base ++ "facebook_active_users-" ++ (show pday) )
 
-edit_logs::PDay->Either String Pipe
+edit_logs::PDay->Either String Node
 edit_logs pday = kpi_log_sorted pday >>= filter (c "type" `eq` kpiSave)
 
 
 vacak day = edit_logs day >>= cut [("p1", "user_id"), ("p2", "prezi_id")] 
                           >>= freq ["user_id", "prezi_id"]  
 
-daily_user_prezi_edits day = pig_node ( edit_logs day
+daily_user_prezi_edits day = storedAsHdfs ( edit_logs day
                                         >>= cut [("p1", "user_id"), ("p2", "prezi_id")] 
                                         >>= freq ["user_id", "prezi_id"]   
                                       )
@@ -76,7 +77,7 @@ daily_user_prezi_edits day = pig_node ( edit_logs day
 
 acc_user_prezi_edits 1235 = daily_user_prezi_edits 1235
 
-acc_user_prezi_edits day = pig_node (union [ acc_user_prezi_edits (day-1),
+acc_user_prezi_edits day = storedAsHdfs (union [ acc_user_prezi_edits (day-1),
                                              daily_user_prezi_edits  day
                                            ]
                                      >>= group ["user_id", "prezi_id"] (Sum $ ComplexSelector (Pos 1) (Name "count")) )
@@ -84,8 +85,8 @@ acc_user_prezi_edits day = pig_node (union [ acc_user_prezi_edits (day-1),
                               (base ++ "acc_user_prezi_edits-" ++ show day)
 
 -- prezi+edit, osszes edit
--}
-{- 
+{-}
+
 monthly_uniq_users::MonthlyFile
 monthly_uniq_users y m = pig_node ( union [daily_uniq_users y m d | d <- days_of_month y m]  
                                       >>= distinct)
@@ -110,10 +111,15 @@ daily_user_save_counts y m d = pig (sum_by 2 [0])
                                [daily_user_prezi_edit_freqs y m d]
                                (printf (out_base "daily_user_save_counts" ) y m d )
 -}
+v (Right n) = pigScriptWithStore n "vacak"
+
+
 main = do
  -- print $ kpi_log_sorted 12
  let range = [ pDayFromGregorian 2012 08 1 .. pDayFromGregorian 2012 08 29   ]
--- doIt $ doAllOf  [facebook_active_users d | d<- range]
- doIt $ kpi_log_sorted 1243
+ -- doIt $ doAllOf  [facebook_active_users d | d<- range]
+ let cucc = (daily_uniq_users 1242)
+ doIt cucc
+ --putStr $ v cucc 
 
     
