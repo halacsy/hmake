@@ -136,6 +136,8 @@ pp (Transformer _ _ (Join typ pipe1 sel1 pipe2 sel2)) = (ident, prev_text ++ "\n
 
 
 pp (Transformer _ _ (Union nodes)) = 
+        if length preds == 1 then head preds
+        else
         (ident, predString ++ "\n" ++ ident ++ " = UNION " ++ predAliases ++ " ;")
     where
         ident = name2Alias predAliases
