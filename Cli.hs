@@ -10,10 +10,8 @@ import Graph
 
 runWithFlags f target = do
     g <- reduce $ target
-    print g
     g2 <- execute2 make g
     mapM putStrLn g2
-    print "done"
     where
         make =  Make `Data.List.elem` f
 

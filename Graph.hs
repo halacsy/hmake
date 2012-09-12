@@ -46,41 +46,54 @@ modTime f = do
         Left ex -> return Nothing
         Right stat ->  return $ Just $ modificationTime stat
 
-haveToGenerateFromTimes::Maybe EpochTime->Bool->[Maybe EpochTime]->Bool
-haveToGenerateFromTimes Nothing _ _ =  True
-haveToGenerateFromTimes _ _ [] = False
-haveToGenerateFromTimes t allNeeded (Nothing:xs) = allNeeded || haveToGenerateFromTimes t allNeeded xs
-haveToGenerateFromTimes (Just t1) allNeeded (Just t2:xs) = if t1 < t2 then True else haveToGenerateFromTimes (Just t1) allNeeded xs
-
 -- one level back, not all files
 triggeringFiles::Node->[File]
 triggeringFiles (InputFile _ f) = [f]
 triggeringFiles (Transformer (Just f) _ _) = [f]
 triggeringFiles (Transformer Nothing _ pipe) = concat $ map triggeringFiles $ getDependencies pipe
 
+
+data Reason = Fresh | TargetMissing | RequiredSourceMissing File | TargetIsOlderThan File deriving (Show)
+haveToGenerateFromTimes::Maybe EpochTime->Bool->[(Maybe EpochTime, File)]->Reason
+haveToGenerateFromTimes Nothing _ _ =  TargetMissing
+haveToGenerateFromTimes _ _ [] = Fresh
+haveToGenerateFromTimes t allNeeded ((Nothing, file):xs) = if allNeeded then RequiredSourceMissing file
+                                                           else haveToGenerateFromTimes t allNeeded xs
+haveToGenerateFromTimes (Just t1) allNeeded ((Just t2, file):xs) = if t1 < t2 then TargetIsOlderThan file
+                                                                   else haveToGenerateFromTimes (Just t1) allNeeded xs
+
+
 have_to_generate::File->Dependency->IO Bool
 --have_to_generate "user-2012-5-1" _ = return Fa
 have_to_generate f dependency = do
         targetTime <- modTime f
+        
         let (nodes, allNeeded) = case dependency of 
                                     All nodes -> (nodes, True)
                                     Any nodes -> (nodes, False)
-    
-        sourcesTime <- mapM modTime $ concatMap triggeringFiles nodes
-     {-   print "checking deps for"
-        print f
-        print "inputs"
-        print nodes
-        print $ concatMap triggeringFiles nodes
-        print "sourcesTime"
-        print sourcesTime -}
-        return $ haveToGenerateFromTimes targetTime allNeeded sourcesTime 
+        let sourceFiles = concatMap triggeringFiles nodes
+        sourcesTime <- mapM modTime sourceFiles
+        let sources = zip sourcesTime sourceFiles
+
+        
+        case haveToGenerateFromTimes targetTime allNeeded sources of
+            Fresh -> do 
+                        myLog $ "file is fresh" ++ (show f)
+                        return False
+            x     -> do
+                        myLog $ "file needs to be generated " ++ show f ++ show x
+                        return True
     
 
 type ExecutionStep = (File, Node)
 data ExecutionPlan = Nil | ExecutionPlan [ExecutionPlan] (Maybe ExecutionStep) deriving (Show, Eq)
-
-
+{-}
+emptyPlan::ExecutionPlan->Bool
+emptyPlan Nil = True
+emptyPlan (ExecutionPlan [] Nothing) = True
+emptyPlan (ExecutionPlan [] (Just _)) = False
+emptyPlan (ExecutionPlan children _) = and $ map emptyPlan children
+-}
 reduce::Node->IO ExecutionPlan
 reduce i@(InputFile _ _) = return Nil
 reduce t@(TaskGroup nodes) =  do
@@ -88,8 +101,12 @@ reduce t@(TaskGroup nodes) =  do
                                 return $ ExecutionPlan children Nothing
 
 reduce node@(Transformer Nothing _ pipeCmd ) = do
-        children <- mapM reduce (getDependencies pipeCmd)
-        return $ ExecutionPlan children Nothing
+        children <-  mapM reduce (getDependencies pipeCmd)
+        let children' = filter ((/=) Nil) children
+        if not $ null children' then
+            return $ ExecutionPlan children' Nothing
+        else
+            return Nil
 
 reduce node@(Transformer (Just output) schema pipeCmd) = 
 		do
@@ -103,7 +120,7 @@ reduce node@(Transformer (Just output) schema pipeCmd) =
             children <-  mapM reduce deps
             let children_to_gen = filter ((/=) Nil) children
           
-         {-   print node
+          {-  print node
             print "too old"
             print too_old
             print "deps"
@@ -113,7 +130,7 @@ reduce node@(Transformer (Just output) schema pipeCmd) =
             print "children to gen"
             print children_to_gen -}
             if (null children_to_gen) && (not too_old) then do
-                    print "returning Nill\n" 
+                 --   print "returning Nill\n" 
                     return Nil
                  else 
                     -- TODO: theoritically output can't be Nothing here but should

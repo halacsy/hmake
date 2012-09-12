@@ -118,7 +118,7 @@ main = do
  -- print $ kpi_log_sorted 12
  let range = [ pDayFromGregorian 2012 08 1 .. pDayFromGregorian 2012 08 29   ]
  -- doIt $ doAllOf  [facebook_active_users d | d<- range]
- let cucc = (daily_uniq_users 1242)
+ let cucc = (acc_user_prezi_edits 1236)
  doIt cucc
  --putStr $ v cucc 
 

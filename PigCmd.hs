@@ -41,8 +41,6 @@ pig_cmd (Transformer (Just (PigFile outFile)) schema pigCmd)  execute =
         print  $ "delete out" ++ outFile
         executePig script
     else do
-        print "pig_cmd"
-        print script
         return $ script
     where
         script = pigScriptWithStore (Transformer Nothing schema pigCmd) outFile

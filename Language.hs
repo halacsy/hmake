@@ -62,7 +62,7 @@ getOutputFiles nodes = map fromJust $ Prelude.filter isJust $ map outputOfNode n
 
 -}
 getActualFile (UnixFile f) = f
-getActualFile (PigFile f) = "/mnt/hdfs" ++ f
+getActualFile (PigFile f) = f -- "/mnt/hdfs" ++ f
 
 
 
