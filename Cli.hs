@@ -20,7 +20,6 @@ doIt (Left error) =
 
 doIt (Right target) = do
   updateGlobalLogger "execute" (setLevel DEBUG)
-  warningM "MyApp.Component2" "Something Bad is about to happen."
   args <- getArgs
   case getOpt RequireOrder options args of
     (flags, [],      [])     -> runWithFlags flags target

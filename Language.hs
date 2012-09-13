@@ -2,12 +2,12 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 module Language where
 import Data.Maybe
-
+import Data.List.Split
 import Schema
 import Control.Monad.Instances
 import Control.Monad
 import qualified Prelude 
-import Prelude hiding (filter)
+import Prelude hiding (filter, sum)
 import Data.List (deleteBy)
 
 
@@ -62,7 +62,7 @@ getOutputFiles nodes = map fromJust $ Prelude.filter isJust $ map outputOfNode n
 
 -}
 getActualFile (UnixFile f) = f
-getActualFile (PigFile f) = f -- "/mnt/hdfs" ++ f
+getActualFile (PigFile f) = "/mnt/hdfs" ++ f
 
 
 
@@ -71,8 +71,6 @@ data Exp = IA Int | SA String | Sub Exp Exp | Selector Selector | Sum Selector |
 -- TODO rename to Exp
 class Expp a where
   toExp::a -> Exp
-
-
 
 data Selector = Pos Int | Name String | ComplexSelector Selector Selector deriving (Show, Eq)
 
@@ -85,9 +83,14 @@ instance Expp Exp where
 class Selectorr a where
   toSelector::a->Selector
 
+-- TODO: doesn't work for complex selectors
 instance Selectorr String where
-  toSelector ('$':col) = undefined
-  toSelector name = Name name 
+  toSelector ('$':col) = Name col -- Pos $ ( (read col)::Int)
+  toSelector name = case (splitOn "." name) of
+                      [] -> Name name
+                      (x:[]) -> Name name
+                      (x1:x2:[]) -> ComplexSelector (toSelector x1) (toSelector x2)
+
 
 data ComparisonOperator = Eq | Neq | Lt | Gt | LtE | GtE | Matches deriving (Show, Eq)
 
@@ -190,6 +193,9 @@ c name = (Name name)
 eq :: (Expp a, Expp b) => a -> b -> Condition
 eq a b = Comp Eq (toExp a) (toExp b)
 
+matches:: (Expp a) => a -> String -> Condition
+matches a b = Comp Matches (toExp a) (SA b)
+
 elem :: (Expp a, Expp b) => a -> [b] -> Condition
 elem x' s' = opJoin Or expressions 
     where
@@ -217,7 +223,8 @@ select xs prev = do
             typeOfGenExp (Flatten selector) = case typeOf (Selector selector) context of
                     Left s -> Left s 
                     Right (_, T schema) -> Right schema
-
+                    Right (_, B _) -> Left $ "can't flatten bags"
+                    Right x -> Right [x]
  
 groupBy::[Exp]-> Step
 groupBy xs p = 
@@ -309,9 +316,14 @@ COUNT(relevant_shows.user_id) as showcount;
 freq::(Selectorr s) => [s]->Step
 freq col = groupBy (map (toExp . toSelector) col) >>> select [Flatten $ Pos 0, Exp ( Count  (Pos 1)) (Just "count") ]
 
+pushDown::Selector->Exp->Exp
+pushDown sp (Sum sc) = Sum (ComplexSelector sp sc)
 
 --group::(Selectorr s) => [s]->Exp->Step
-group col fun = groupBy (map (toExp . toSelector) col)  >>> select [Flatten $ Pos 0, Exp ( fun ) (Just "count") ]
+group col fun = groupBy (map (toExp . toSelector) col)  >>> select [Flatten $ Pos 0, Exp ( pushDown (Pos 1) fun ) (Just "count") ]
+
+sum :: Selectorr a => a -> Exp
+sum s = Sum (toSelector s)
 {-}
 cum col = group col (Count  (Pos 1))
 -}

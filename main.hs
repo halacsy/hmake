@@ -6,7 +6,7 @@ import Util
 import Graph 
 import Cli
 import Schema
-import Prelude hiding (elem, filter)
+import Prelude hiding (elem, filter, sum)
 import Print
 
 kpiCodesWithUserActivity::[Int]
@@ -18,6 +18,7 @@ kpiSave = 3
 type DaylyFile = PDay->Either String Node
 type MonthlyFile = PMonth -> Either String Node
 
+
 kpi_schema = [(Just "date", S), 
               (Just "time", S), 
               (Just "hostname", S), 
@@ -27,9 +28,39 @@ kpi_schema = [(Just "date", S),
               (Just "p2", S), 
               (Just "p3", S)] 
 
+-- date,time,hostname,logtype,loglevel,client_date,client_time,ip,prezi_oid,user_id,p1,p2,p3);
+client_log_schema = [(Just "date", S),
+              (Just "time", S), 
+              (Just "hostname", S), 
+              (Just "logtype", S),
+              (Just "loglevel", S),
+              (Just "client_date", S),
+              (Just "client_time", S),
+              (Just "ip", S),
+              (Just "oid", S),
+              (Just "user_id", I),
+              (Just "p1", S),
+              (Just "p2", S),
+              (Just "p3", S)]
+
+scribeFile::String->PDay->File
+scribeFile category pday = (PigFile ("/scribe/" ++ category ++ "/" ++ category ++ "-" ++ (showPDayAsGregorian pday) ++ "_00*"))
+
 --	kpi_log y m d = Right $ InputFile kpi_schema (PigFile  $ printf "/scribe/kpi/kpi-%04d-%02d-%02d_00000" y m d)
 kpi_log_raw::PDay->Either String Node
 kpi_log_raw pday = Right $ InputFile kpi_schema (PigFile  $"/scribe/kpi/kpi-" ++ (showPDayAsGregorian pday) ++ "_00*")
+
+client_log::PDay->Either String Node
+client_log pday = Right $ InputFile client_log_schema $ scribeFile "client" pday 
+
+
+
+daily_detected_languages pday = storedAsHdfs
+                                    ( client_log pday >>= 
+                                      filter (c "p2" `matches` "language_detected") >>= 
+                                      cut [("p3", "language")] >>= 
+                                      freq ["language"]
+                                    ) (base ++ "/daily_detected_languages-" ++ show pday )
 
 
 
@@ -78,9 +109,9 @@ daily_user_prezi_edits day = storedAsHdfs ( edit_logs day
 acc_user_prezi_edits 1235 = daily_user_prezi_edits 1235
 
 acc_user_prezi_edits day = storedAsHdfs (union [ acc_user_prezi_edits (day-1),
-                                             daily_user_prezi_edits  day
-                                           ]
-                                     >>= group ["user_id", "prezi_id"] (Sum $ ComplexSelector (Pos 1) (Name "count")) )
+                                                 daily_user_prezi_edits  day
+                                               ]
+                                     >>= group ["user_id", "prezi_id"] (sum "count") )
 
                               (base ++ "acc_user_prezi_edits-" ++ show day)
 
@@ -118,7 +149,7 @@ main = do
  -- print $ kpi_log_sorted 12
  let range = [ pDayFromGregorian 2012 08 1 .. pDayFromGregorian 2012 08 29   ]
  -- doIt $ doAllOf  [facebook_active_users d | d<- range]
- let cucc = (acc_user_prezi_edits 1236)
+ let cucc = (daily_detected_languages 1236)
  doIt cucc
  --putStr $ v cucc 
 
