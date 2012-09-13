@@ -44,6 +44,7 @@ client_log_schema = [(Just "date", S),
               (Just "p3", S)]
 
 scribeFile::String->PDay->File
+scribeFile "client" _ = (PigFile "client.log")
 scribeFile category pday = (PigFile ("/scribe/" ++ category ++ "/" ++ category ++ "-" ++ (showPDayAsGregorian pday) ++ "_00*"))
 
 --	kpi_log y m d = Right $ InputFile kpi_schema (PigFile  $ printf "/scribe/kpi/kpi-%04d-%02d-%02d_00000" y m d)
@@ -55,12 +56,13 @@ client_log pday = Right $ InputFile client_log_schema $ scribeFile "client" pday
 
 
 
-daily_detected_languages pday = storedAsHdfs
-                                    ( client_log pday >>= 
-                                      filter (c "p2" `matches` "language_detected") >>= 
-                                      cut [("p3", "language")] >>= 
+daily_detected_languages pday = --storedAsHdfs
+                                   --(
+                                     client_log pday >>= 
+                                      filter (c "p2" `matches` "language_detected.*") >>= 
+                                      select [(Exp (substring "p2" 24 29) (Just "language"))] >>= 
                                       freq ["language"]
-                                    ) (base ++ "/daily_detected_languages-" ++ show pday )
+                                    --) (base ++ "/daily_detected_languages-" ++ show pday )
 
 
 
@@ -68,8 +70,8 @@ kpi_code = 4
 kpi_user = 5
 kpi_prezi = 6
 
---base = "/user/hp/"
-base = "/Users/hp/"
+base = "/user/hp/"
+--base = "/Users/hp/"
 out_base name = base ++ name 
 
 -- log files come in every day. Some log messages are late -> arrive X days later they are about
@@ -97,8 +99,9 @@ edit_logs::PDay->Either String Node
 edit_logs pday = kpi_log_sorted pday >>= filter (c "type" `eq` kpiSave)
 
 
-vacak day = edit_logs day >>= cut [("p1", "user_id"), ("p2", "prezi_id")] 
-                          >>= freq ["user_id", "prezi_id"]  
+vacak pday =storedAsHdfs ( union [daily_detected_languages day | day <- [pday - 10 .. pday] ]
+            >>= group ["language"] (sum "count")
+            ) (base ++ "/vacak" ++ show pday)
 
 daily_user_prezi_edits day = storedAsHdfs ( edit_logs day
                                         >>= cut [("p1", "user_id"), ("p2", "prezi_id")] 
@@ -149,8 +152,8 @@ main = do
  -- print $ kpi_log_sorted 12
  let range = [ pDayFromGregorian 2012 08 1 .. pDayFromGregorian 2012 08 29   ]
  -- doIt $ doAllOf  [facebook_active_users d | d<- range]
- let cucc = (daily_detected_languages 1236)
- doIt cucc
+ let cucc = (vacak 1236)
+ doIt $ cucc
  --putStr $ v cucc 
 
     

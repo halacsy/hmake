@@ -66,7 +66,7 @@ getActualFile (PigFile f) = "/mnt/hdfs" ++ f
 
 
 
-data Exp = IA Int | SA String | Sub Exp Exp | Selector Selector | Sum Selector | Count Selector  deriving (Show, Eq)
+data Exp = IA Int | SA String | Sub Exp Exp | Selector Selector | Sum Selector | Count Selector | SubString Exp Int Int deriving (Show, Eq)
 
 -- TODO rename to Exp
 class Expp a where
@@ -91,6 +91,8 @@ instance Selectorr String where
                       (x:[]) -> Name name
                       (x1:x2:[]) -> ComplexSelector (toSelector x1) (toSelector x2)
 
+instance Selectorr Selector where
+  toSelector = id
 
 data ComparisonOperator = Eq | Neq | Lt | Gt | LtE | GtE | Matches deriving (Show, Eq)
 
@@ -141,6 +143,13 @@ myConcat (Right t1) (Right t2) = (Right (t1 ++t2))
 typeOf::Exp->Schema->Either String NamedT
 typeOf (IA _) _ = Right (Nothing, I)
 typeOf (SA _) _ = Right (Nothing, S)
+typeOf (SubString exp i j) context = if j < i then Left "invalid start stop"
+                                     else 
+                                      case typeOf exp context of
+                                      Right (_ , S) -> Right  (Nothing, S)
+                                      Left s -> Left s
+                                      otherwise -> Left "substring of a non string"
+
 typeOf (Sum selector) context = do
                             t <- typeOf (Selector selector) context
                             case t of
@@ -238,8 +247,8 @@ groupBy xs p =
             groupType::Either String [NamedT]
             groupType = if length xs == 1 then 
                           do
-                            (_, x) <- typeOf (head xs) (schemaOfNode p)
-                            return [(Just "group", x)]
+                            (name, x) <- typeOf (head xs) (schemaOfNode p)
+                            return [(name, x)]
                         else 
                             -- if there are more elements pig creates a tuple
                             do
@@ -324,6 +333,9 @@ group col fun = groupBy (map (toExp . toSelector) col)  >>> select [Flatten $ Po
 
 sum :: Selectorr a => a -> Exp
 sum s = Sum (toSelector s)
+
+substring:: Selectorr a => a-> Int->Int->Exp
+substring s start stop = SubString (toExp $ toSelector s) start stop
 {-}
 cum col = group col (Count  (Pos 1))
 -}

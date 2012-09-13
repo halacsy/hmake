@@ -35,6 +35,7 @@ instance   Pprint Exp where
     pprint (Selector (Pos i)) = "$" ++ (show i)
     pprint (Selector (Name s)) = s
     pprint (Sum e) = "SUM (" ++ pprint (Selector e) ++ ")"
+    pprint (SubString e start stop) = "SUBSTRING (" ++ pprint e ++ ", " ++ show start ++ ", " ++ show stop ++ ")"
     pprint (Count e) = "COUNT(" ++ pprint (Selector e) ++ ")"
     pprint (Selector (ComplexSelector sel1 sel2)) = pprint (Selector sel1) ++ "." ++ pprint (Selector sel2)
     {-
